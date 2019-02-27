@@ -1,0 +1,107 @@
+#!/bin/bash
+
+CRONSH_ATTEMPTS_MAX=1
+CRONSH_ATTEMPTS_TIMEOUT=0
+CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
+CRONSH_ATTEMPTS_DEADLINE=0
+CRONSH_ATTEMPTS_INTERVAL=0
+CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
+
+set -e
+jobdir=$1
+cd "$jobdir"
+exec 9>>lock
+set +e
+
+. config
+
+
+exit_failure()
+{
+	[ ! -e post-instance ] || . post-instance
+	exit $CRONSH_LAST_STATUS
+}
+exit_successfull()
+{
+	exit 0
+}
+die()
+{
+	echo "cronsh: <$jobdir> $*" >&2
+	exit 255
+}
+human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
+
+
+if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
+then
+	flock --shared --nonblock 9 || die "Can not acquire shared lock"
+else
+	flock --exclusive --nonblock 9 || die "Can not acquire exclusive lock"
+fi
+
+
+now=`date +%s.%N`
+CRONSH_INSTANCE_START_TIMESTAMP=${now%.*}
+CRONSH_INSTANCE_START_TIMESTAMP_NS=$now
+CRONSH_ATTEMPT_NUMBER=0
+[ -z "$CRONSH_ATTEMPTS_DEADLINE_DATESTR" ] || CRONSH_ATTEMPTS_DEADLINE=`date +%s -d"$CRONSH_ATTEMPTS_DEADLINE_DATESTR"`
+
+export CRONSH_INSTANCE_START_TIMESTAMP
+export CRONSH_ATTEMPT_NUMBER
+
+
+[ ! -e pre-instance ] || . pre-instance
+
+
+while true
+do
+	let CRONSH_ATTEMPT_NUMBER++
+	CRONSH_ATTEMPT_START_TIMESTAMP=`date +%s`
+	export CRONSH_ATTEMPT_START_TIMESTAMP
+	
+	[ ! -e pre-attempt ] || . pre-attempt
+	
+	(
+		set -e
+		
+		workdir=instance/$CRONSH_INSTANCE_START_TIMESTAMP_NS/attempt-$CRONSH_ATTEMPT_NUMBER
+		mkdir -p "$workdir"
+		
+		exec 1>>"$workdir/stdout.txt"
+		exec 2>>"$workdir/stderr.txt"
+		
+		ln -sfn "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "instance/$(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$human_date_fmt")"
+		ln -sfn "attempt-$CRONSH_ATTEMPT_NUMBER" "instance/$CRONSH_INSTANCE_START_TIMESTAMP_NS/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP +"$human_date_fmt")"
+		
+		cd "$workdir"
+		./job
+	)
+	
+	CRONSH_LAST_STATUS=$?
+	export CRONSH_LAST_STATUS
+	
+	now=`date +%s`
+	
+	if [ $CRONSH_LAST_STATUS = 0 ]
+	then
+		exit_successfull
+	else
+		if [ $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
+		then
+			exit_failure
+		fi
+		if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
+		then
+			exit_failure
+		fi
+		if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
+		then
+			exit_failure
+		fi
+		
+		[ ! -e post-attempt ] || . post-attempt
+		
+		sleep $CRONSH_ATTEMPTS_INTERVAL
+	fi
+done
