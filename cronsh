@@ -5,7 +5,6 @@ CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
 CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
-CRONSH_ATTEMPTS_DEADLINE=0
 CRONSH_ATTEMPTS_INTERVAL=0
 
 set -e -u
@@ -44,7 +43,38 @@ note()
 }
 to_sec()
 {
-	date +%s -d "1970-01-01 00:00 +0000 $*"
+	to_datefmt %s "$@"
+}
+to_nsec()
+{
+	to_datefmt %s.%N "$@"
+}
+to_datefmt()
+{
+	local fmt=$1
+	shift
+	if expr "$*" : '^[0-9.]\+$' >/dev/null
+	then
+		echo "$*"
+	else
+		date +"$fmt" -d "1970-01-01 00:00 +0000 $*"
+	fi
+}
+check_timeout()
+{
+	if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
+	then
+		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, attempts timed out ($CRONSH_ATTEMPTS_TIMEOUT sec)"
+		exit_failure
+	fi
+}
+check_deadline()
+{
+	if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
+	then
+		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE))"
+		exit_failure
+	fi
 }
 human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
 
@@ -59,14 +89,15 @@ fi
 
 CRONSH_INSTANCE_START_TIMESTAMP_NS=`date +%s.%N`
 CRONSH_INSTANCE_START_TIMESTAMP=${CRONSH_INSTANCE_START_TIMESTAMP_NS%.*}
-CRONSH_ATTEMPT_NUMBER=0
+CRONSH_ATTEMPTS_DEADLINE=0
 [ -z "$CRONSH_ATTEMPTS_DEADLINE_DATESTR" ] || CRONSH_ATTEMPTS_DEADLINE=`date +%s -d "$CRONSH_ATTEMPTS_DEADLINE_DATESTR"`
 CRONSH_LAST_STATUS=''
 CRONSH_ATTEMPTS_TIMEOUT=`to_sec $CRONSH_ATTEMPTS_TIMEOUT`
-CRONSH_ATTEMPTS_INTERVAL=`to_sec $CRONSH_ATTEMPTS_INTERVAL`
+CRONSH_ATTEMPTS_INTERVAL=`to_nsec $CRONSH_ATTEMPTS_INTERVAL`
+CRONSH_ATTEMPT_NUMBER=0
 
 # display config variables
-env | grep -E ^CRONSH_ | sort >&2
+set | grep -E ^CRONSH_ | sort >&2
 
 export CRONSH_JOBDIR_ABS
 export CRONSH_INSTANCE_START_TIMESTAMP
@@ -115,24 +146,21 @@ do
 	then
 		exit_successfull
 	else
-		if [ $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
+		if [ $CRONSH_ATTEMPTS_MAX != 0 -a $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
 		then
 			note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached max attempts $CRONSH_ATTEMPTS_MAX"
 			exit_failure
 		fi
-		if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
-		then
-			note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, attempts timed out ($CRONSH_ATTEMPTS_TIMEOUT sec)"
-			exit_failure
-		fi
-		if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
-		then
-			note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE))"
-			exit_failure
-		fi
+		check_timeout
+		check_deadline
 		
 		[ ! -e post-attempt ] || . post-attempt
 		
 		sleep $CRONSH_ATTEMPTS_INTERVAL
+		
+		now=`date +%s`
+		
+		check_timeout
+		check_deadline
 	fi
 done
