@@ -8,13 +8,20 @@ CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_DEADLINE=0
 CRONSH_ATTEMPTS_INTERVAL=0
 
-set -e
-jobdir=$1
-cd "$jobdir"
+set -e -u
+CRONSH_JOBDIR=$1
+if [ "${CRONSH_JOBDIR:0:1}" = / ]
+then
+	CRONSH_JOBDIR_ABS=$CRONSH_JOBDIR
+else
+	CRONSH_JOBDIR_ABS=$PWD/$CRONSH_JOBDIR
+fi
+cd "$CRONSH_JOBDIR"
 exec 9>>lock
-set +e
+set +e +u
 
-. config
+
+[ ! -e config ] || . config
 
 
 exit_failure()
@@ -28,7 +35,7 @@ exit_successfull()
 }
 die()
 {
-	echo "cronsh: <$jobdir> $*" >&2
+	echo "cronsh: <$CRONSH_JOBDIR> $*" >&2
 	exit 255
 }
 human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
@@ -48,6 +55,7 @@ CRONSH_ATTEMPT_NUMBER=0
 [ -z "$CRONSH_ATTEMPTS_DEADLINE_DATESTR" ] || CRONSH_ATTEMPTS_DEADLINE=`date +%s -d"$CRONSH_ATTEMPTS_DEADLINE_DATESTR"`
 CRONSH_LAST_STATUS=''
 
+export CRONSH_JOBDIR_ABS
 export CRONSH_INSTANCE_START_TIMESTAMP
 export CRONSH_ATTEMPT_NUMBER
 export CRONSH_LAST_STATUS
@@ -81,7 +89,7 @@ do
 		ln -sfn "attempt-$CRONSH_ATTEMPT_NUMBER" "instance/$CRONSH_INSTANCE_START_TIMESTAMP_NS/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP_NS +"$human_date_fmt")"
 		
 		cd "$CRONSH_WORKDIR"
-		./job
+		$CRONSH_JOBDIR_ABS/job
 	)
 	
 	CRONSH_LAST_STATUS=$?
