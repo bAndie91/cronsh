@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+# Set variable defaults
 CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
 #TODO#CRONSH_HARD_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_MAX=1
@@ -9,6 +11,17 @@ CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
 
+
+# Read config variables passed by CLI argumentum
+declare -A config_override
+while expr "$1" : '.\+=' >/dev/null
+do
+	config_override[${1%%=*}]=${1#*=}
+	shift
+done
+
+
+# Set Job directory
 set -e -u
 CRONSH_JOBDIR=$1
 if [ "${CRONSH_JOBDIR:0:1}" = / ]
@@ -22,8 +35,20 @@ exec 9>>lock
 set +e +u
 
 
+# Load the job's saved configuration
 [ ! -e config ] || . config
 
+
+# Override config variables with ones passed by CLI args
+for var in "${!config_override[@]}"
+do
+	value=${config_override[$var]}
+	eval "$var=\$value"
+done
+unset var value
+
+
+# Define subroutines
 
 exit_failure()
 {
@@ -85,6 +110,7 @@ random_range()
 human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
 
 
+# Acquire Lock
 if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
 then
 	flock --shared --nonblock 9 || die "Can not acquire shared lock"
@@ -93,6 +119,7 @@ else
 fi
 
 
+# Set computed variables
 CRONSH_INSTANCE_START_TIMESTAMP_NS=`date +%s.%N`
 CRONSH_INSTANCE_START_TIMESTAMP=${CRONSH_INSTANCE_START_TIMESTAMP_NS%.*}
 CRONSH_ATTEMPTS_DEADLINE=0
@@ -116,7 +143,8 @@ else
 	CRONSH_ATTEMPTS_RANDOM_DELAY=(0 `to_sec "$CRONSH_ATTEMPTS_RANDOM_DELAY"`)
 fi
 
-# display config variables
+
+# Display config variables
 set | grep -E ^CRONSH_ | sort >&2
 
 export CRONSH_JOBDIR_ABS
@@ -124,6 +152,9 @@ export CRONSH_INSTANCE_START_TIMESTAMP
 export CRONSH_ATTEMPT_NUMBER
 export CRONSH_LAST_STATUS
 
+
+
+# Start the Job
 
 sleep `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}`
 
@@ -188,3 +219,6 @@ do
 		check_deadline
 	fi
 done
+
+# TODO
+# proper termination
