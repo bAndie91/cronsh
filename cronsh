@@ -107,6 +107,11 @@ random_range()
 {
 	echo $[RANDOM % ($2 + 1 - $1) + $1]
 }
+sleep()
+{
+	note "Sleeping $* ..."
+	command sleep "$@"
+}
 human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
 
 
@@ -222,3 +227,6 @@ done
 
 # TODO
 # proper termination
+# log in foreground
+# verbose/debug mode
+# standardize IDs in log messages
