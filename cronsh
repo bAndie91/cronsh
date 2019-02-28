@@ -197,10 +197,9 @@ do
 	)
 	
 	CRONSH_LAST_STATUS=$?
-	
-	note instance "$CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, exit status $CRONSH_LAST_STATUS"
-	
 	now=`date +%s`
+	echo $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
+	note instance "$CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, exit status $CRONSH_LAST_STATUS"
 	
 	if [ $CRONSH_LAST_STATUS = 0 ]
 	then
