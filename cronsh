@@ -112,7 +112,9 @@ sleep()
 	note "Sleeping $* ..."
 	command sleep "$@"
 }
-human_date_fmt="%Y-%m-%d_%H:%M:%S.%N"
+human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
+human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
+human_date_fmt_min="%Y-%m-%d_%H:%M"
 
 
 # Acquire Lock
@@ -171,11 +173,13 @@ do
 	let CRONSH_ATTEMPT_NUMBER++
 	CRONSH_ATTEMPT_START_TIMESTAMP_NS=`date +%s.%N`
 	CRONSH_ATTEMPT_START_TIMESTAMP=${CRONSH_ATTEMPT_START_TIMESTAMP_NS%.*}
-	CRONSH_WORKDIR=work/$CRONSH_INSTANCE_START_TIMESTAMP_NS/attempt-$CRONSH_ATTEMPT_NUMBER
+	CRONSH_WORKDIR_BASE=work
+	CRONSH_ATTEMPTS_BASEDIR=$CRONSH_WORKDIR_BASE/$CRONSH_INSTANCE_START_TIMESTAMP_NS
+	CRONSH_ATTEMPT_DIRNAME=attempt-$CRONSH_ATTEMPT_NUMBER
+	CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
 	CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
 	
 	export CRONSH_ATTEMPT_START_TIMESTAMP
-	export CRONSH_WORKDIR
 	export CRONSH_WORKDIR_ABS
 
 	sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}`
@@ -189,8 +193,11 @@ do
 		exec 1>>"$CRONSH_WORKDIR/stdout.txt"
 		exec 2>>"$CRONSH_WORKDIR/stderr.txt"
 		
-		ln -sfn "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "work/$(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$human_date_fmt")"
-		ln -sfn "attempt-$CRONSH_ATTEMPT_NUMBER" "work/$CRONSH_INSTANCE_START_TIMESTAMP_NS/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP_NS +"$human_date_fmt")"
+		for datefmt in "$human_date_fmt_nsec" "$human_date_fmt_sec" "$human_date_fmt_min"
+		do
+			ln -sfn "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "$CRONSH_WORKDIR_BASE/$(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$datefmt")"
+			ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP_NS +"$datefmt")"
+		done
 		
 		cd "$CRONSH_WORKDIR"
 		$CRONSH_JOBDIR_ABS/job
