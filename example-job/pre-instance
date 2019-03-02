@@ -2,11 +2,3 @@
 # do not chdir.
 # if you chdir, go back to the initial dir at the end
 #
-# available variables:
-# 
-# CRONSH_INSTANCE_START_TIMESTAMP
-# CRONSH_ATTEMPT_START_TIMESTAMP
-# CRONSH_ATTEMPT_NUMBER
-# CRONSH_LAST_STATUS
-# CRONSH_JOBDIR_ABS
-# CRONSH_WORKDIR_ABS

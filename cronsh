@@ -52,11 +52,14 @@ unset var value
 
 exit_failure()
 {
+	[ ! -e post-instance-failure ] || . post-instance-failure
 	[ ! -e post-instance ] || . post-instance
 	exit $CRONSH_LAST_STATUS
 }
 exit_successfull()
 {
+	[ ! -e post-instance-success ] || . post-instance-success
+	[ ! -e post-instance ] || . post-instance
 	exit 0
 }
 die()
@@ -91,6 +94,7 @@ check_timeout()
 {
 	if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
 	then
+		CRONSH_STOP_REASON=attempt-timeout
 		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, attempts timed out ($CRONSH_ATTEMPTS_TIMEOUT sec)"
 		exit_failure
 	fi
@@ -99,6 +103,7 @@ check_deadline()
 {
 	if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
 	then
+		CRONSH_STOP_REASON=attempt-deadline
 		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE))"
 		exit_failure
 	fi
@@ -214,6 +219,7 @@ do
 	else
 		if [ $CRONSH_ATTEMPTS_MAX != 0 -a $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
 		then
+			CRONSH_STOP_REASON=attempt-limit
 			note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached max attempts $CRONSH_ATTEMPTS_MAX"
 			exit_failure
 		fi
@@ -236,3 +242,5 @@ done
 # log in foreground
 # verbose/debug mode
 # standardize IDs in log messages
+# invocation: recursive
+# CRONSH_SHOULD_RUN time spec
