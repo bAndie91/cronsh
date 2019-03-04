@@ -52,14 +52,14 @@ unset var value
 
 exit_failure()
 {
-	[ ! -e post-instance-failure ] || . post-instance-failure
 	[ ! -e post-instance ] || . post-instance
+	[ ! -e failure ] || ./failure
 	exit $CRONSH_LAST_STATUS
 }
-exit_successfull()
+exit_successful()
 {
-	[ ! -e post-instance-success ] || . post-instance-success
 	[ ! -e post-instance ] || . post-instance
+	[ ! -e success ] || ./success
 	exit 0
 }
 die()
@@ -193,7 +193,7 @@ do
 	
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
-
+	
 	sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}`
 	
 	[ ! -e pre-attempt ] || . pre-attempt
@@ -222,7 +222,7 @@ do
 	
 	if [ $CRONSH_LAST_STATUS = 0 ]
 	then
-		exit_successfull
+		exit_successful
 	else
 		if [ $CRONSH_ATTEMPTS_MAX != 0 -a $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
 		then
