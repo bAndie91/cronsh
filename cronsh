@@ -31,6 +31,7 @@ else
 	CRONSH_JOBDIR_ABS=$PWD/$CRONSH_JOBDIR
 fi
 cd "$CRONSH_JOBDIR"
+# Open file descriptor to lock later on
 exec 9>>lock
 set +e +u
 
@@ -95,7 +96,7 @@ check_timeout()
 	if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
 	then
 		CRONSH_STOP_REASON=attempt-timeout
-		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, attempts timed out ($CRONSH_ATTEMPTS_TIMEOUT sec)"
+		note "attempting is timed out at attempt $CRONSH_ATTEMPT_NUMBER ($CRONSH_ATTEMPTS_TIMEOUT sec)"
 		exit_failure
 	fi
 }
@@ -104,7 +105,7 @@ check_deadline()
 	if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
 	then
 		CRONSH_STOP_REASON=attempt-deadline
-		note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE))"
+		note "reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE)) at attempt $CRONSH_ATTEMPT_NUMBER"
 		exit_failure
 	fi
 }
@@ -115,7 +116,7 @@ random_range()
 sleep()
 {
 	note "Sleeping $* ..."
-	command sleep "$@"
+	command sleep "$1"
 }
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
@@ -131,9 +132,25 @@ else
 fi
 
 
-# Set computed variables
+# Generate instance unique variables
 CRONSH_INSTANCE_START_TIMESTAMP_NS=`date +%s.%N`
 CRONSH_INSTANCE_START_TIMESTAMP=${CRONSH_INSTANCE_START_TIMESTAMP_NS%.*}
+CRONSH_WORKDIR_BASE=work
+CRONSH_ATTEMPTS_BASEDIR=$CRONSH_WORKDIR_BASE/$CRONSH_INSTANCE_START_TIMESTAMP_NS
+CRONSH_INSTANCE_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR
+
+# Save Job Instance's PID and setup logging
+set -e
+mkdir -p "$CRONSH_INSTANCE_WORKDIR"
+echo -n $$ >"$CRONSH_INSTANCE_WORKDIR/pid"
+exec {stdout_copy}>&1
+exec {stderr_copy}>&2
+exec 1> >(tee "$CRONSH_INSTANCE_WORKDIR/stdout.txt" >&1)
+exec 2> >(tee "$CRONSH_INSTANCE_WORKDIR/stderr.txt" >&2)
+set +e
+
+
+# Set other computed variables
 CRONSH_ATTEMPTS_DEADLINE=0
 [ -z "$CRONSH_ATTEMPTS_DEADLINE_DATESTR" ] || CRONSH_ATTEMPTS_DEADLINE=`date +%s -d "$CRONSH_ATTEMPTS_DEADLINE_DATESTR"`
 CRONSH_LAST_STATUS=''
@@ -154,30 +171,22 @@ then
 else
 	CRONSH_ATTEMPTS_RANDOM_DELAY=(0 `to_sec "$CRONSH_ATTEMPTS_RANDOM_DELAY"`)
 fi
-CRONSH_WORKDIR_BASE=work
-CRONSH_ATTEMPTS_BASEDIR=$CRONSH_WORKDIR_BASE/$CRONSH_INSTANCE_START_TIMESTAMP_NS
-CRONSH_INSTANCE_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR
 
 
-# Display config variables
-set | grep -E ^CRONSH_ | sort >&2
-
+# Expose instance specific variables
 export CRONSH_JOBDIR_ABS
 export CRONSH_INSTANCE_START_TIMESTAMP
 export CRONSH_ATTEMPT_NUMBER
 export CRONSH_LAST_STATUS
 
 
-# Save Job Instance's PID
-set -e
-mkdir -p "$CRONSH_INSTANCE_WORKDIR"
-echo -n $$ >$CRONSH_INSTANCE_WORKDIR/pid
-set +e
+# Display config variables
+set | grep -E ^CRONSH_ | sort | sed -e 's/^/env: /' >&2
 
 
 # Start the Job
 
-sleep `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}`
+sleep `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}` random delay before starting job
 
 [ ! -e pre-instance ] || . pre-instance
 
@@ -191,10 +200,14 @@ do
 	CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
 	CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
 	
+	# Expose attempt specific variables
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
 	
-	sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}`
+	if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
+	then
+		sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}` random delay before an attempt
+	fi
 	
 	[ ! -e pre-attempt ] || . pre-attempt
 	
@@ -202,8 +215,8 @@ do
 		set -e
 		mkdir -p "$CRONSH_WORKDIR"
 		
-		exec 1>>"$CRONSH_WORKDIR/stdout.txt"
-		exec 2>>"$CRONSH_WORKDIR/stderr.txt"
+		exec 1> >(tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
+		exec 2> >(tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
 		
 		for datefmt in "$human_date_fmt_nsec" "$human_date_fmt_sec" "$human_date_fmt_min"
 		do
@@ -218,7 +231,7 @@ do
 	CRONSH_LAST_STATUS=$?
 	now=`date +%s`
 	echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
-	note instance "$CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, exit status $CRONSH_LAST_STATUS"
+	note "exit status $CRONSH_LAST_STATUS at attempt $CRONSH_ATTEMPT_NUMBER"
 	
 	if [ $CRONSH_LAST_STATUS = 0 ]
 	then
@@ -227,7 +240,7 @@ do
 		if [ $CRONSH_ATTEMPTS_MAX != 0 -a $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
 		then
 			CRONSH_STOP_REASON=attempt-limit
-			note "instance $CRONSH_INSTANCE_START_TIMESTAMP_NS, attempt $CRONSH_ATTEMPT_NUMBER, reached max attempts $CRONSH_ATTEMPTS_MAX"
+			note "reached max attempts ($CRONSH_ATTEMPTS_MAX)"
 			exit_failure
 		fi
 		check_timeout
@@ -235,7 +248,7 @@ do
 		
 		[ ! -e post-attempt ] || . post-attempt
 		
-		sleep $CRONSH_ATTEMPTS_INTERVAL
+		sleep $CRONSH_ATTEMPTS_INTERVAL between attempts
 		
 		now=`date +%s`
 		
@@ -246,8 +259,7 @@ done
 
 # TODO
 # proper termination
-# log in foreground
 # verbose/debug mode
-# standardize IDs in log messages
 # invocation: recursive
 # CRONSH_SHOULD_RUN time spec
+# detect config change and reload
