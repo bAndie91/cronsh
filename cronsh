@@ -32,7 +32,7 @@ else
 fi
 cd "$CRONSH_JOBDIR"
 # Open file descriptor to lock later on
-exec 9>>lock
+exec {CRONSH_LOCK_FD}>>lock
 set +e +u
 
 
@@ -128,9 +128,9 @@ human_date_fmt_min="%Y-%m-%d_%H:%M"
 # Acquire Lock
 if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
 then
-	flock --shared --nonblock 9 || die "Can not acquire shared lock"
+	flock --shared --nonblock $CRONSH_LOCK_FD || die "Can not acquire shared lock"
 else
-	flock --exclusive --nonblock 9 || die "Can not acquire exclusive lock"
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "Can not acquire exclusive lock"
 fi
 
 
@@ -145,6 +145,8 @@ CRONSH_INSTANCE_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR
 set -e
 mkdir -p "$CRONSH_INSTANCE_WORKDIR"
 echo -n $$ >"$CRONSH_INSTANCE_WORKDIR/pid"
+exec {CRONSH_INSTANCE_LOCK_FD}>>"$CRONSH_INSTANCE_WORKDIR/pid"
+flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
 exec {stdout_copy}>&1
 exec {stderr_copy}>&2
 exec 1> >(tee "$CRONSH_INSTANCE_WORKDIR/stdout.txt" >&1)
@@ -227,7 +229,7 @@ do
 		done
 		
 		cd "$CRONSH_WORKDIR"
-		nice -n 19 ionice -c 3 sh -c 'set -e; echo -n $$ >"$CRONSH_WORKDIR_ABS/pid"; exec "$CRONSH_JOBDIR_ABS/job"'
+		nice -n 19 ionice -c 3 sh -c 'set -e; pidfile=$CRONSH_WORKDIR_ABS/pid; echo -n $$ >"$pidfile"; exec flock --exclusive --nonblock "$pidfile" "$CRONSH_JOBDIR_ABS/job"'
 	)
 	
 	CRONSH_LAST_STATUS=$?
