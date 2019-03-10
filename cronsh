@@ -115,8 +115,10 @@ random_range()
 }
 sleep()
 {
-	note "Sleeping $* ..."
-	command sleep "$1"
+	local t=$1
+	shift
+	note "sleep $t: $*"
+	command sleep "$t"
 }
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
@@ -258,6 +260,7 @@ do
 done
 
 # TODO
+# list current running jobs
 # proper termination
 # verbose/debug mode
 # invocation: recursive
