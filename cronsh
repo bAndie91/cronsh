@@ -138,8 +138,8 @@ exec {CRONSH_INSTANCE_LOCK_FD}>>"$CRONSH_INSTANCE_WORKDIR/pid"
 flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
 exec {stdout_copy}>&1
 exec {stderr_copy}>&2
-exec 1> >(tee "$CRONSH_INSTANCE_WORKDIR/stdout.txt" >&1)
-exec 2> >(tee "$CRONSH_INSTANCE_WORKDIR/stderr.txt" >&2)
+exec 1> >(exec tee "$CRONSH_INSTANCE_WORKDIR/stdout.txt" >&1)
+exec 2> >(exec tee "$CRONSH_INSTANCE_WORKDIR/stderr.txt" >&2)
 set +e
 
 
@@ -210,8 +210,8 @@ do
 		set -e
 		mkdir -p "$CRONSH_WORKDIR"
 		
-		exec 1> >(tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
-		exec 2> >(tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
+		exec 1> >(exec tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
+		exec 2> >(exec tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
 		
 		for datefmt in "$human_date_fmt_nsec" "$human_date_fmt_sec" "$human_date_fmt_min"
 		do
