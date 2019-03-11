@@ -3,7 +3,6 @@
 
 # Set variable defaults
 CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
-#TODO#CRONSH_HARD_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
@@ -51,62 +50,55 @@ unset var value
 
 # Define subroutines
 
-exit_failure()
-{
-	[ ! -e post-instance ] || . post-instance
-	[ ! -e failure ] || ./failure
-	exit $CRONSH_LAST_STATUS
-}
-exit_successful()
-{
-	[ ! -e post-instance ] || . post-instance
-	[ ! -e success ] || ./success
-	exit 0
-}
-die()
-{
-	note "$@"
-	exit 255
-}
-note()
-{
-	echo "cronsh: <$CRONSH_JOBDIR> $*" >&2
-}
-to_sec()
-{
-	to_datefmt %s "$@"
-}
-to_nsec()
-{
-	to_datefmt %s.%N "$@"
-}
-to_datefmt()
-{
-	local fmt=$1
-	shift
-	if expr "$*" : '^[0-9.]\+$' >/dev/null
+set -e
+for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
+do
+	if [ -z "$libdir" ]
 	then
-		echo "$*"
-	else
-		date +"$fmt" -d "1970-01-01 00:00 +0000 $*"
+		echo "can not source cronsh-common" >&2
+		false
 	fi
+	if [ -e "$libdir/cronsh-common" ]
+	then
+		. "$libdir/cronsh-common"
+		break
+	fi
+done
+set +e
+
+exit_cronsh()
+{
+	[ ! -e post-instance ] || . post-instance
+	
+	if [ $CRONSH_LAST_STATUS != 0 ]
+	then
+		[ ! -e failure ] || ./failure
+	else
+		[ ! -e success ] || ./success
+	fi
+	
+	echo -n '' >"$CRONSH_INSTANCE_WORKDIR/end"
+	
+	exit $CRONSH_LAST_STATUS
 }
 check_timeout()
 {
+	local now=`date +%s`
 	if [ $CRONSH_ATTEMPTS_TIMEOUT != 0 -a $[now - CRONSH_INSTANCE_START_TIMESTAMP] -gt $CRONSH_ATTEMPTS_TIMEOUT ]
 	then
 		CRONSH_STOP_REASON=attempt-timeout
 		note "attempting is timed out at attempt $CRONSH_ATTEMPT_NUMBER ($CRONSH_ATTEMPTS_TIMEOUT sec)"
-		exit_failure
+		exit_cronsh
 	fi
 }
 check_deadline()
 {
+	local now=`date +%s`
 	if [ $CRONSH_ATTEMPTS_DEADLINE != 0 -a $now -gt $CRONSH_ATTEMPTS_DEADLINE ]
 	then
 		CRONSH_STOP_REASON=attempt-deadline
 		note "reached deadline ($(date +"%F %T" -d @$CRONSH_ATTEMPTS_DEADLINE)) at attempt $CRONSH_ATTEMPT_NUMBER"
-		exit_failure
+		exit_cronsh
 	fi
 }
 random_range()
@@ -120,9 +112,6 @@ sleep()
 	note "sleep $t: $*"
 	command sleep "$t"
 }
-human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
-human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
-human_date_fmt_min="%Y-%m-%d_%H:%M"
 
 
 # Acquire Lock
@@ -211,6 +200,8 @@ do
 	if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 	then
 		sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}` random delay before an attempt
+		check_timeout
+		check_deadline
 	fi
 	
 	[ ! -e pre-attempt ] || . pre-attempt
@@ -233,19 +224,18 @@ do
 	)
 	
 	CRONSH_LAST_STATUS=$?
-	now=`date +%s`
 	echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
 	note "exit status $CRONSH_LAST_STATUS at attempt $CRONSH_ATTEMPT_NUMBER"
 	
 	if [ $CRONSH_LAST_STATUS = 0 ]
 	then
-		exit_successful
+		exit_cronsh
 	else
 		if [ $CRONSH_ATTEMPTS_MAX != 0 -a $CRONSH_ATTEMPT_NUMBER -ge $CRONSH_ATTEMPTS_MAX ]
 		then
 			CRONSH_STOP_REASON=attempt-limit
 			note "reached max attempts ($CRONSH_ATTEMPTS_MAX)"
-			exit_failure
+			exit_cronsh
 		fi
 		check_timeout
 		check_deadline
@@ -253,8 +243,6 @@ do
 		[ ! -e post-attempt ] || . post-attempt
 		
 		sleep $CRONSH_ATTEMPTS_INTERVAL between attempts
-		
-		now=`date +%s`
 		
 		check_timeout
 		check_deadline
@@ -268,3 +256,4 @@ done
 # invocation: recursive
 # CRONSH_SHOULD_RUN time spec
 # detect config change and reload
+# timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE

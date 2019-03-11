@@ -1,0 +1,36 @@
+#!/bin/bash
+
+die()
+{
+	note "$@"
+	exit 255
+}
+note()
+{
+	[ -z "$*" ] || echo "cronsh: <$CRONSH_JOBDIR> $*" >&2
+}
+to_sec()
+{
+	to_datefmt %s "$@"
+}
+to_nsec()
+{
+	to_datefmt %s.%N "$@"
+}
+to_datefmt()
+{
+	local fmt=$1
+	shift
+	if expr "$*" : '^[0-9.]\+$' >/dev/null
+	then
+		echo "$*"
+	else
+		date +"$fmt" -d "1970-01-01 00:00 +0000 $*"
+	fi
+}
+
+human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
+human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
+human_date_fmt_min="%Y-%m-%d_%H:%M"
+human_date_fmt_ls="%Y-%m-%d %H:%M"
+human_date_fmt_ls_width=16

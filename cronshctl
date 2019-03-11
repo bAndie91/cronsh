@@ -1,0 +1,110 @@
+#!/bin/bash
+
+
+set -e
+for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
+do
+	if [ -z "$libdir" ]
+	then
+		echo "can not source cronsh-common" >&2
+		false
+	fi
+	if [ -e "$libdir/cronsh-common" ]
+	then
+		. "$libdir/cronsh-common"
+		break
+	fi
+done
+set +e
+
+
+is_locked()
+{
+	! flock --nonblock --shared "$1" true
+}
+
+
+
+shopt -s extglob
+
+cmd=$1
+shift
+
+case "$cmd" in
+ls)
+	show_last_n=''
+	show_active_only=yes
+	
+	while [ -n "$1" ]
+	do
+		case "$1" in
+		-l|--last)
+			show_active_only=no
+			if [ "$2" -ge 0 ] 2>/dev/null
+			then
+				show_last_n=$2
+				shift
+			else
+				show_last_n=1
+			fi
+			;;
+		--)	shift; break;;
+		-*)	die "unknown option: $1";;
+		*)	break;;
+		esac
+		shift
+	done
+	
+	CRONSH_JOBDIR=$1
+	shift
+	cd "$CRONSH_JOBDIR/work" || die
+	
+	all_instances=(+([0-9]).+([0-9]))
+	show_instances=("${all_instances[@]}")
+	
+	if [ -n "$show_last_n" ]
+	then
+		show_instances=()
+		for ((i=show_last_n; i>=1; i--)) { show_instances+=("${all_instances[-$i]}"); }
+	fi
+	
+	
+	# print header
+	fmt="%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
+	printf "$fmt" PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
+	
+	
+	for instancedir in "${show_instances[@]}"
+	do
+		instance_started_nsec=${instancedir##*/}
+		
+		if is_locked $instancedir/pid
+		then
+			instancepid=`cat "$instancedir/pid" 2>/dev/null`
+		else
+			if [ $show_active_only = yes ]
+			then
+				continue
+			fi
+			instancepid=''
+		fi
+		
+		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
+		ended=`date +"$human_date_fmt_ls" -r "$instancedir/end" 2>/dev/null`
+		attempts=`find "$instancedir" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1`
+		if [ -e "$instancedir/attempt-$attempts/status" ]
+		then
+			# this job attempt is ended
+			lastattempt=$attempts
+			attemptpid=''
+		else
+			# this job attempt is in progress
+			lastattempt=$[attempts - 1]
+			attemptpid=`cat "$instancedir/attempt-$attempts/pid" 2>/dev/null`
+		fi
+		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
+		
+		printf "$fmt" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+	done
+	;;
+esac
