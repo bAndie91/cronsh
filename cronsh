@@ -70,7 +70,7 @@ exit_cronsh()
 {
 	[ ! -e post-instance ] || . post-instance
 	
-	if [ $CRONSH_LAST_STATUS != 0 ]
+	if [ "$CRONSH_LAST_STATUS" != 0 ]
 	then
 		[ ! -e failure ] || ./failure
 	else
@@ -79,7 +79,7 @@ exit_cronsh()
 	
 	echo -n '' >"$CRONSH_INSTANCE_WORKDIR/end"
 	
-	exit $CRONSH_LAST_STATUS
+	exit ${CRONSH_LAST_STATUS:-255}
 }
 check_timeout()
 {
@@ -110,7 +110,7 @@ sleep()
 	local t=$1
 	shift
 	note "sleep $t: $*"
-	command sleep "$t"
+	command sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
 
 
@@ -121,6 +121,17 @@ then
 else
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "Can not acquire exclusive lock"
 fi
+
+
+cronsh_termination()
+{
+	CRONSH_STOP_REASON=SIGTERM
+	# we may kill our processes, but process group has not created for us (setsid)
+	# kill -s TERM -$$
+	exit_cronsh
+}
+
+trap 'cronsh_termination' TERM
 
 
 # Generate instance unique variables
