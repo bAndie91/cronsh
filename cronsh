@@ -9,6 +9,7 @@ CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
+CRONSH_ENABLED=yes
 
 
 # Read config variables passed by CLI argumentum
@@ -113,16 +114,6 @@ sleep()
 	command sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
 
-
-# Acquire Lock
-if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
-then
-	flock --shared --nonblock $CRONSH_LOCK_FD || die "Can not acquire shared lock"
-else
-	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "Can not acquire exclusive lock"
-fi
-
-
 cronsh_termination()
 {
 	CRONSH_STOP_REASON=SIGTERM
@@ -132,6 +123,21 @@ cronsh_termination()
 }
 
 trap 'cronsh_termination' TERM
+
+
+if [ $CRONSH_ENABLED != yes ]
+then
+	die "Job is disabled."
+fi
+
+
+# Acquire Lock
+if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
+then
+	flock --shared --nonblock $CRONSH_LOCK_FD || die "Can not acquire shared lock"
+else
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "Can not acquire exclusive lock"
+fi
 
 
 # Generate instance unique variables
