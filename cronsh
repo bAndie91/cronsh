@@ -9,7 +9,7 @@ CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
-CRONSH_ENABLED=yes
+CRONSH_ENABLE=yes
 
 
 # Read config variables passed by CLI argumentum
@@ -125,7 +125,7 @@ cronsh_termination()
 trap 'cronsh_termination' TERM
 
 
-if [ $CRONSH_ENABLED != yes ]
+if [ $CRONSH_ENABLE != yes ]
 then
 	die "Job is disabled."
 fi
