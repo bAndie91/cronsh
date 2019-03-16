@@ -237,7 +237,13 @@ do
 		done
 		
 		cd "$CRONSH_WORKDIR"
-		nice -n 19 ionice -c 3 sh -c 'set -e; pidfile=$CRONSH_WORKDIR_ABS/pid; echo -n $$ >"$pidfile"; exec flock --exclusive --nonblock "$pidfile" "$CRONSH_JOBDIR_ABS/job"'
+		nice -n 19 ionice -c 3 \
+			sh -c '
+				set -e;
+				pidfile=$CRONSH_WORKDIR_ABS/pid;
+				echo -n $$ >"$pidfile";
+				exec flock --exclusive --nonblock "$pidfile" cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job"
+			'
 	)
 	
 	CRONSH_LAST_STATUS=$?
