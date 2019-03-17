@@ -32,6 +32,11 @@ shift
 
 case "$cmd" in
 ls)
+	usage()
+	{
+		echo "Usage: cronshctl ls [--last | -l [N]]] [--all | -a] [<job-directory>]" >&2
+	}
+	
 	show_last_n=''
 	show_active_only=yes
 	
@@ -48,6 +53,13 @@ ls)
 				show_last_n=1
 			fi
 			;;
+		-a|--all)
+			show_active_only=no
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
 		--)	shift; break;;
 		-*)	die "unknown option: $1";;
 		*)	break;;
@@ -55,6 +67,7 @@ ls)
 		shift
 	done
 	
+	[ -d "$1" ] || { usage; exit 2; }
 	CRONSH_JOBDIR=$1
 	shift
 	cd "$CRONSH_JOBDIR/work" || die
@@ -64,8 +77,11 @@ ls)
 	
 	if [ -n "$show_last_n" ]
 	then
-		show_instances=()
-		for ((i=show_last_n; i>=1; i--)) { show_instances+=("${all_instances[-$i]}"); }
+		if [ $show_last_n -lt ${#all_instances[@]} ]
+		then
+			show_instances=()
+			for ((i=show_last_n; i>=1; i--)) { show_instances+=("${all_instances[-$i]}"); }
+		fi
 	fi
 	
 	
