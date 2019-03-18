@@ -129,4 +129,11 @@ ls)
 		printf "$fmt" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done
 	;;
+
+kill)
+	usage()
+	{
+		echo "Usage: cronshctl kill [<job-directory> | <instance-directory> | <attempt-directory>]" >&2
+	}
+	;;
 esac

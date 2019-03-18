@@ -110,6 +110,7 @@ sleep()
 {
 	local t=$1
 	shift
+	[ "$t" != 0 ] || return
 	note "sleep $t: $*"
 	command sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
@@ -238,11 +239,13 @@ do
 		
 		cd "$CRONSH_WORKDIR"
 		nice -n 19 ionice -c 3 \
-			sh -c '
+			bash -c '
 				set -e;
 				pidfile=$CRONSH_WORKDIR_ABS/pid;
-				echo -n $$ >"$pidfile";
-				exec flock --exclusive --nonblock "$pidfile" cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job"
+				exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
+				echo -n $$ >&$CRONSH_ATTEMPT_LOCK_FD;
+				flock --exclusive --nonblock $CRONSH_ATTEMPT_LOCK_FD;
+				exec cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job";
 			'
 	)
 	
@@ -273,10 +276,9 @@ do
 done
 
 # TODO
-# list current running jobs
 # proper termination
-# verbose/debug mode
-# invocation: recursive
 # CRONSH_SHOULD_RUN time spec
-# detect config change and reload
+# invocation: recursive
 # timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE
+# verbose/debug mode
+# detect config change and reload
