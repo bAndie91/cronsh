@@ -114,9 +114,15 @@ ls)
 			lastattempt=$attempts
 			attemptpid=''
 		else
-			# this job attempt is in progress
+			# this job attempt is in progress or died abnormally
 			lastattempt=$[attempts - 1]
-			attemptpid=`cat "$instancedir/attempt-$attempts/pid" 2>/dev/null`
+			pidfile=$instancedir/attempt-$attempts/pid
+			if [ -e "$pidfile" ] && is_locked "$pidfile" 
+			then
+				attemptpid=`cat "$pidfile"`
+			else
+				attemptpid=''
+			fi
 		fi
 		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
 		
