@@ -10,6 +10,7 @@ CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
 CRONSH_ENABLE=yes
+CRONSH_STOP_REASON=''
 
 
 # Read config variables passed by CLI argumentum
@@ -117,10 +118,15 @@ sleep()
 
 cronsh_termination()
 {
-	CRONSH_STOP_REASON=SIGTERM
-	# we may kill our processes, but process group has not created for us (setsid)
-	# kill -s TERM -$$
-	exit_cronsh
+	CRONSH_STOP_REASON=terminate
+	
+	if [ -n "$CRONSH_ATTEMPT_PID" ]
+	then
+		note "Terminating Job ($CRONSH_ATTEMPT_PID) ..."
+		kill -s TERM $CRONSH_ATTEMPT_PID
+	else
+		exit_cronsh
+	fi
 }
 
 trap 'cronsh_termination' TERM
@@ -238,20 +244,30 @@ do
 		done
 		
 		cd "$CRONSH_WORKDIR"
-		nice -n 19 ionice -c 3 \
-			bash -c '
-				set -e;
-				pidfile=$CRONSH_WORKDIR_ABS/pid;
-				exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
-				echo -n $$ >&$CRONSH_ATTEMPT_LOCK_FD;
-				flock --exclusive --nonblock $CRONSH_ATTEMPT_LOCK_FD;
-				exec cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job";
-			'
-	)
+		renice -n 19 -p $$ >/dev/null
+		# ??? # {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
+		ionice -c 3 -p $$
+		exec setsid bash -c '
+			set -e;
+			pidfile=$CRONSH_WORKDIR_ABS/pid;
+			exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
+			echo -n $$ >&$CRONSH_ATTEMPT_LOCK_FD;
+			flock --exclusive --nonblock $CRONSH_ATTEMPT_LOCK_FD;
+			exec cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job";
+		'
+	) &
+	CRONSH_ATTEMPT_PID=$!
+	wait $CRONSH_ATTEMPT_PID
 	
 	CRONSH_LAST_STATUS=$?
+	CRONSH_ATTEMPT_PID=''
 	echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
 	note "exit status $CRONSH_LAST_STATUS at attempt $CRONSH_ATTEMPT_NUMBER"
+	
+	if [ "$CRONSH_STOP_REASON" = terminate ]
+	then
+		exit_cronsh
+	fi
 	
 	if [ $CRONSH_LAST_STATUS = 0 ]
 	then
@@ -278,6 +294,7 @@ done
 # TODO
 # proper termination
 # CRONSH_SHOULD_RUN time spec
+# emulate terminal
 # invocation: recursive
 # timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE
 # verbose/debug mode

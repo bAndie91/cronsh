@@ -18,11 +18,23 @@ done
 set +e
 
 
-is_locked()
-{
-	! flock --nonblock --shared "$1" true
-}
 
+find_last_attempt_number()
+{
+	find "$1" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1
+}
+find_current_attempt_pid()
+{
+	local lastattempt=`find_last_attempt_number "$1"`
+	if [ ! -e "$1/attempt-$lastattempt/status" ]
+	then
+		local pidfile=$1/attempt-$lastattempt/pid
+		if [ -e "$pidfile" ] && is_locked "$pidfile"
+		then
+			cat "$pidfile" 2>/dev/null
+		fi
+	fi
+}
 
 
 shopt -s extglob
@@ -107,14 +119,15 @@ ls)
 		
 		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
 		ended=`date +"$human_date_fmt_ls" -r "$instancedir/end" 2>/dev/null`
-		attempts=`find "$instancedir" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1`
+		attempts=`find_last_attempt_number "$instancedir"`
+		
 		if [ -e "$instancedir/attempt-$attempts/status" ]
 		then
 			# this job attempt is ended
 			lastattempt=$attempts
 			attemptpid=''
 		else
-			# this job attempt is in progress or died abnormally
+			# this job attempt is in progress
 			lastattempt=$[attempts - 1]
 			pidfile=$instancedir/attempt-$attempts/pid
 			if [ -e "$pidfile" ] && is_locked "$pidfile" 
@@ -130,10 +143,84 @@ ls)
 	done
 	;;
 
-kill)
+stop|kill)
 	usage()
 	{
-		echo "Usage: cronshctl kill [<job-directory> | <instance-directory> | <attempt-directory>]" >&2
+		echo "Usage: cronshctl stop [--grace <SEC>] [<job-directory> | <job-instance-directory>]" >&2
 	}
+	
+	grace=0
+	
+	while [ -n "$1" ]
+	do
+		case "$1" in
+		-g|--grace)
+			shift
+			grace=$1
+			[ "$grace" -ge 0 ] || die
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--)	shift; break;;
+		-*)	die "unknown option: $1";;
+		*)	break;;
+		esac
+		shift
+	done
+	
+	[ -d "$1" ] || { usage; exit 2; }
+	if [ -e "$1/lock" ]
+	then
+		CRONSH_JOBDIR=$1
+		CRONSH_INSTANCE_WORKDIR=''
+	else
+		CRONSH_INSTANCE_WORKDIR=`readlink -f "$1"`
+		CRONSH_JOBDIR=`dirname "$(dirname "$CRONSH_INSTANCE_WORKDIR")"`
+	fi
+	shift
+	
+	
+	for instancedir in "$CRONSH_INSTANCE_WORKDIR"
+	do
+		if is_locked "$instancedir/pid"
+		then
+			instancepid=`cat "$instancedir/pid"`
+			attemptpid=`find_current_attempt_pid "$instancedir"`
+			sleep_interval=1
+			interrupt_signal_sent=no
+			
+			kill -s TERM $instancepid
+			signal_time=`date +%s`
+			
+			echo -n "Wait for termination " >&2
+			
+			for x in 1
+			do
+				while is_locked "$instancedir/pid"
+				do
+					if [ $interrupt_signal_sent = no ]
+					then
+						now=`date +%s`
+						if [ $[signal_time + grace] -lt $now ]
+						then
+							if [ -n "$attemptpid" ]
+							then
+								echo "Interrupt Job's Process Group" >&2
+								kill -s INT -$attemptpid
+								interrupt_signal_sent=yes
+								echo -n "Wait for termination " >&2
+							fi
+						fi
+					fi
+					sleep $sleep_interval
+					echo -n "." >&2
+				done
+				
+				echo "DONE" >&2
+			done
+		fi
+	done
 	;;
 esac
