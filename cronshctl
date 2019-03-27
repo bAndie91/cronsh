@@ -23,6 +23,11 @@ find_last_attempt_number()
 {
 	find "$1" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1
 }
+find_last_attempt_pid()
+{
+	local lastattempt=`find_last_attempt_number "$1"`
+	cat "$1/attempt-$lastattempt/pid"
+}
 find_current_attempt_pid()
 {
 	local lastattempt=`find_last_attempt_number "$1"`
@@ -143,21 +148,19 @@ ls)
 	done
 	;;
 
-stop|kill)
+stop)
 	usage()
 	{
-		echo "Usage: cronshctl stop [--grace <SEC>] [<job-directory> | <job-instance-directory>]" >&2
+		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory>]" >&2
 	}
 	
-	grace=0
+	terminate_pgroup=no
 	
 	while [ -n "$1" ]
 	do
 		case "$1" in
-		-g|--grace)
-			shift
-			grace=$1
-			[ "$grace" -ge 0 ] || die
+		-g|--pgroup)
+			terminate_pgroup=yes
 			;;
 		-h|--help)
 			usage
@@ -182,39 +185,44 @@ stop|kill)
 	shift
 	
 	
-	for instancedir in "$CRONSH_INSTANCE_WORKDIR"
+	for instancedir in "$CRONSH_INSTANCE_WORKDIR" # TODO
 	do
 		if is_locked "$instancedir/pid"
 		then
 			instancepid=`cat "$instancedir/pid"`
-			attemptpid=`find_current_attempt_pid "$instancedir"`
-			sleep_interval=1
-			interrupt_signal_sent=no
+			check_interval=1
+			pgroup_kill_delay=2
+			pgroup_signal_sent=no
 			
+			# First inform Job Instance process about termination
 			kill -s TERM $instancepid
 			signal_time=`date +%s`
 			
 			echo -n "Wait for termination " >&2
 			
+			# This single-iteration loop enable us to "break 2" from the inner loop
 			for x in 1
 			do
+				# Wait until Job terminates itself
 				while is_locked "$instancedir/pid"
 				do
-					if [ $interrupt_signal_sent = no ]
+					attemptpid=`find_last_attempt_pid "$instancedir"`
+					
+					if [ -n "$attemptpid" ]
 					then
-						now=`date +%s`
-						if [ $[signal_time + grace] -lt $now ]
+						if [ $terminate_pgroup = yes -a $pgroup_signal_sent = no ]
 						then
-							if [ -n "$attemptpid" ]
+							if [ $[signal_time + pgroup_kill_delay] -lt `date +%s` ]
 							then
-								echo "Interrupt Job's Process Group" >&2
-								kill -s INT -$attemptpid
-								interrupt_signal_sent=yes
+								echo "Terminate Job's Process Group" >&2
+								kill -s TERM -- -$attemptpid
+								pgroup_signal_sent=yes
 								echo -n "Wait for termination " >&2
 							fi
 						fi
 					fi
-					sleep $sleep_interval
+					
+					sleep $check_interval
 					echo -n "." >&2
 				done
 				

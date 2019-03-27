@@ -293,6 +293,7 @@ done
 
 # TODO
 # proper termination
+#  handle ctrl-c on terminal
 # CRONSH_SHOULD_RUN time spec
 # emulate terminal
 # invocation: recursive
