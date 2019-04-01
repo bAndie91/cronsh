@@ -10,6 +10,9 @@ CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
 CRONSH_ENABLE=yes
+CRONSH_NICE=19
+CRONSH_IONICE_CLASS=idle
+CRONSH_IONICE_CLASSDATA=''
 
 
 # Read config variables passed by CLI argumentum
@@ -182,6 +185,15 @@ then
 else
 	CRONSH_ATTEMPTS_RANDOM_DELAY=(0 `to_sec "$CRONSH_ATTEMPTS_RANDOM_DELAY"`)
 fi
+if ! [ "$CRONSH_IONICE_CLASS" -ge 0 ] 2>/dev/null
+then
+	case "$CRONSH_IONICE_CLASS" in
+	none) CRONSH_IONICE_CLASS=0;;
+	realtime) CRONSH_IONICE_CLASS=1;;
+	best-effort) CRONSH_IONICE_CLASS=2;;
+	idle) CRONSH_IONICE_CLASS=3;;
+	esac
+fi
 
 
 # Expose instance specific variables
@@ -238,7 +250,7 @@ do
 		done
 		
 		cd "$CRONSH_WORKDIR"
-		nice -n 19 ionice -c 3 \
+		nice -n "$CRONSH_NICE" ionice -c "$CRONSH_IONICE_CLASS" ${CRONSH_IONICE_CLASSDATA:+-n "$CRONSH_IONICE_CLASSDATA"} \
 			bash -c '
 				set -e;
 				pidfile=$CRONSH_WORKDIR_ABS/pid;
