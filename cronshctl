@@ -2,6 +2,7 @@
 
 
 set -e
+enable kill
 for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
 do
 	if [ -z "$libdir" ]

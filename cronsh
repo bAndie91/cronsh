@@ -10,6 +10,7 @@ CRONSH_ATTEMPTS_INTERVAL=0
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
 CRONSH_ENABLE=yes
+CRONSH_CAUGHT_SIGNAL=no
 CRONSH_STOP_REASON=''
 
 
@@ -24,6 +25,7 @@ done
 
 # Set Job directory
 set -e -u
+enable kill
 CRONSH_JOBDIR=$1
 if [ "${CRONSH_JOBDIR:0:1}" = / ]
 then
@@ -116,9 +118,15 @@ sleep()
 	command sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
 
-cronsh_termination()
+is_pgid_exists()
 {
-	CRONSH_STOP_REASON=terminate
+	kill -n 0 -- -$1 2>/dev/null
+}
+
+cronsh_signal()
+{
+	CRONSH_CAUGHT_SIGNAL=yes
+	CRONSH_STOP_REASON=$1
 	
 	if [ -n "$CRONSH_ATTEMPT_PID" ]
 	then
@@ -129,7 +137,9 @@ cronsh_termination()
 	fi
 }
 
-trap 'cronsh_termination' TERM
+trap 'cronsh_signal terminate' TERM
+trap 'cronsh_signal interrupt' INT
+
 
 
 if [ $CRONSH_ENABLE != yes ]
@@ -257,6 +267,7 @@ do
 		'
 	) &
 	CRONSH_ATTEMPT_PID=$!
+	CRONSH_ATTEMPT_PGID=$CRONSH_ATTEMPT_PID
 	wait $CRONSH_ATTEMPT_PID
 	
 	CRONSH_LAST_STATUS=$?
@@ -264,8 +275,18 @@ do
 	echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
 	note "exit status $CRONSH_LAST_STATUS at attempt $CRONSH_ATTEMPT_NUMBER"
 	
-	if [ "$CRONSH_STOP_REASON" = terminate ]
+	if [ "$CRONSH_CAUGHT_SIGNAL" = yes ]
 	then
+		trap '' TERM
+		trap 'kill -s TERM -- -$CRONSH_ATTEMPT_PGID' INT
+		if is_pgid_exists $CRONSH_ATTEMPT_PGID
+		then
+			note "wait Job Progress Group to terminate"
+			while is_pgid_exists $CRONSH_ATTEMPT_PGID
+			do
+				command sleep 0.5
+			done
+		fi
 		exit_cronsh
 	fi
 	
@@ -292,9 +313,7 @@ do
 done
 
 # TODO
-# proper termination
-#  handle ctrl-c on terminal
-# precontitions
+# preconditions
 # CRONSH_SHOULD_RUN time spec
 # emulate terminal, attach/detach
 # invocation: recursive
