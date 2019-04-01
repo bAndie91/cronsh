@@ -30,7 +30,7 @@ to_datefmt()
 }
 is_locked()
 {
-	! flock --nonblock --shared "$1" true
+	[ -e "$1" ] && ! flock --nonblock --shared "$1" true
 }
 
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"

@@ -34,7 +34,7 @@ find_current_attempt_pid()
 	if [ ! -e "$1/attempt-$lastattempt/status" ]
 	then
 		local pidfile=$1/attempt-$lastattempt/pid
-		if [ -e "$pidfile" ] && is_locked "$pidfile"
+		if is_locked "$pidfile"
 		then
 			cat "$pidfile" 2>/dev/null
 		fi
@@ -43,6 +43,7 @@ find_current_attempt_pid()
 
 
 shopt -s extglob
+shopt -s nullglob
 
 cmd=$1
 shift
@@ -51,7 +52,7 @@ case "$cmd" in
 ls)
 	usage()
 	{
-		echo "Usage: cronshctl ls [--last | -l [N]]] [--all | -a] [<job-directory>]" >&2
+		echo "Usage: cronshctl ls [--last | -l [<N>]] [--all | -a] [<job-directory>]" >&2
 	}
 	
 	show_last_n=''
@@ -135,7 +136,7 @@ ls)
 			# this job attempt is in progress
 			lastattempt=$[attempts - 1]
 			pidfile=$instancedir/attempt-$attempts/pid
-			if [ -e "$pidfile" ] && is_locked "$pidfile" 
+			if is_locked "$pidfile"
 			then
 				attemptpid=`cat "$pidfile"`
 			else
@@ -151,10 +152,16 @@ ls)
 stop)
 	usage()
 	{
-		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory>]" >&2
+		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory> [<dir> [...]]]" >&2
 	}
 	
 	terminate_pgroup=no
+	check_interval=1
+	pgroup_signal_sent=no
+	pgroup_kill_delay=2
+	instance_workdirs=()
+	active_instance_workdirs=()
+	declare -A pending_instances=()
 	
 	while [ -n "$1" ]
 	do
@@ -174,61 +181,80 @@ stop)
 	done
 	
 	[ -d "$1" ] || { usage; exit 2; }
-	if [ -e "$1/lock" ]
-	then
-		CRONSH_JOBDIR=$1
-		CRONSH_INSTANCE_WORKDIR=''
-	else
-		CRONSH_INSTANCE_WORKDIR=`readlink -f "$1"`
-		CRONSH_JOBDIR=`dirname "$(dirname "$CRONSH_INSTANCE_WORKDIR")"`
-	fi
-	shift
 	
-	
-	for instancedir in "$CRONSH_INSTANCE_WORKDIR" # TODO
+	while [ -n "$1" ]
 	do
+		if [ -e "$1/lock" ]
+		then
+			# If there is a file called "lock" in the directory, we count it as a Job Root dir
+			# and add all instance directories to the list, as it'll be filtered later;
+			instance_workdirs+=( "$1"/work/+([0-9]).+([0-9]) )
+		else
+			# Otherwise it's must be a Job Instance dir
+			instance_workdirs+=( "$1" )
+		fi
+		shift
+	done
+	
+	
+	# Signal Job Instance processes
+	for instancedir in "${instance_workdirs[@]}"
+	do
+		# Filter for active Job Instances only
 		if is_locked "$instancedir/pid"
 		then
-			instancepid=`cat "$instancedir/pid"`
-			check_interval=1
-			pgroup_kill_delay=2
-			pgroup_signal_sent=no
-			
 			# First inform Job Instance process about termination
-			kill -s TERM $instancepid
-			signal_time=`date +%s`
-			
-			echo -n "Wait for termination " >&2
-			
-			# This single-iteration loop enable us to "break 2" from the inner loop
-			for x in 1
-			do
-				# Wait until Job terminates itself
-				while is_locked "$instancedir/pid"
-				do
-					attemptpid=`find_last_attempt_pid "$instancedir"`
-					
-					if [ -n "$attemptpid" ]
-					then
-						if [ $terminate_pgroup = yes -a $pgroup_signal_sent = no ]
-						then
-							if [ $[signal_time + pgroup_kill_delay] -lt `date +%s` ]
-							then
-								echo "Terminate Job's Process Group" >&2
-								kill -s TERM -- -$attemptpid
-								pgroup_signal_sent=yes
-								echo -n "Wait for termination " >&2
-							fi
-						fi
-					fi
-					
-					sleep $check_interval
-					echo -n "." >&2
-				done
-				
-				echo "DONE" >&2
-			done
+			instancepid=`cat "$instancedir/pid"`
+			kill -s TERM $instancepid  # FIXME it may kill unrelated process who reused this pid
+			pending_instances[$instancedir]=$instancepid
+			active_instance_workdirs+=("$instancedir")
 		fi
 	done
+	signal_time=`date +%s`
+	
+	
+	while true
+	do
+		for instancedir in "${!pending_instances[@]}"
+		do
+			if ! is_locked "$instancedir/pid"
+			then
+				unset "pending_instances[$instancedir]"
+			fi
+		done
+		
+		if [ ${#pending_instances[@]} = 0 ]
+		then
+			break
+		fi
+		
+		echo "Wait for termination (${#pending_instances[@]}/${#active_instance_workdirs[@]})" >&2
+		
+		if [ $terminate_pgroup = yes -a $pgroup_signal_sent = no ]
+		then
+			if [ $[signal_time + pgroup_kill_delay] -le `date +%s` ]
+			then
+				echo "Terminate Job's Process Group" >&2
+				
+				for instancedir in "${!pending_instances[@]}"
+				do
+					attemptpid=`find_last_attempt_pid "$instancedir"`
+					if [ -n "$attemptpid" ]
+					then
+						kill -s TERM -- -$attemptpid  # FIXME sometimes not exists
+					fi
+				done
+				
+				pgroup_signal_sent=yes
+			fi
+		fi
+		
+		sleep $check_interval
+	done
+	;;
+
+*)
+	echo "cronshctl [ls | stop]" >&2
+	exit 1
 	;;
 esac

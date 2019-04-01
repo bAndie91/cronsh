@@ -245,7 +245,7 @@ do
 		
 		cd "$CRONSH_WORKDIR"
 		renice -n 19 -p $$ >/dev/null
-		# ??? # {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
+		# TODO ??? # {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 		ionice -c 3 -p $$
 		exec setsid bash -c '
 			set -e;
@@ -294,8 +294,9 @@ done
 # TODO
 # proper termination
 #  handle ctrl-c on terminal
+# precontitions
 # CRONSH_SHOULD_RUN time spec
-# emulate terminal
+# emulate terminal, attach/detach
 # invocation: recursive
 # timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE
 # verbose/debug mode
