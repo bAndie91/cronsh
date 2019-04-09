@@ -2,6 +2,7 @@
 
 
 set -e
+enable kill
 for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
 do
 	if [ -z "$libdir" ]
@@ -18,14 +19,32 @@ done
 set +e
 
 
-is_locked()
+
+find_last_attempt_number()
 {
-	! flock --nonblock --shared "$1" true
+	find "$1" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1
+}
+find_last_attempt_pidfile()
+{
+	local lastattempt=`find_last_attempt_number "$1"`
+	echo "$1/attempt-$lastattempt/pid"
+}
+find_current_attempt_pid()
+{
+	local lastattempt=`find_last_attempt_number "$1"`
+	if [ ! -e "$1/attempt-$lastattempt/status" ]
+	then
+		local pidfile=$1/attempt-$lastattempt/pid
+		if is_locked "$pidfile"
+		then
+			cat "$pidfile" 2>/dev/null
+		fi
+	fi
 }
 
 
-
 shopt -s extglob
+shopt -s nullglob
 
 cmd=$1
 shift
@@ -34,7 +53,7 @@ case "$cmd" in
 ls)
 	usage()
 	{
-		echo "Usage: cronshctl ls [--last | -l [N]]] [--all | -a] [<job-directory>]" >&2
+		echo "Usage: cronshctl ls [--last | -l [<N>]] [--all | -a] [<job-directory>]" >&2
 	}
 	
 	show_last_n=''
@@ -107,17 +126,18 @@ ls)
 		
 		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
 		ended=`date +"$human_date_fmt_ls" -r "$instancedir/end" 2>/dev/null`
-		attempts=`find "$instancedir" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1`
+		attempts=`find_last_attempt_number "$instancedir"`
+		
 		if [ -e "$instancedir/attempt-$attempts/status" ]
 		then
 			# this job attempt is ended
 			lastattempt=$attempts
 			attemptpid=''
 		else
-			# this job attempt is in progress or died abnormally
+			# this job attempt is in progress
 			lastattempt=$[attempts - 1]
 			pidfile=$instancedir/attempt-$attempts/pid
-			if [ -e "$pidfile" ] && is_locked "$pidfile" 
+			if is_locked "$pidfile"
 			then
 				attemptpid=`cat "$pidfile"`
 			else
@@ -130,10 +150,119 @@ ls)
 	done
 	;;
 
-kill)
+stop)
 	usage()
 	{
-		echo "Usage: cronshctl kill [<job-directory> | <instance-directory> | <attempt-directory>]" >&2
+		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory> [<dir> [...]]]" >&2
 	}
+	
+	terminate_pgroup=no
+	check_interval=1
+	pgroup_signal_sent=no
+	pgroup_kill_delay=2
+	instance_workdirs=()
+	active_instance_workdirs=()
+	declare -A pending_instances=()
+	
+	while [ -n "$1" ]
+	do
+		case "$1" in
+		-g|--pgroup)
+			terminate_pgroup=yes
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--)	shift; break;;
+		-*)	die "unknown option: $1";;
+		*)	break;;
+		esac
+		shift
+	done
+	
+	[ -d "$1" ] || { usage; exit 2; }
+	
+	while [ -n "$1" ]
+	do
+		if [ -e "$1/lock" ]
+		then
+			# If there is a file called "lock" in the directory, we count it as a Job Root dir
+			# and add all instance directories to the list, as it'll be filtered later;
+			instance_workdirs+=( "$1"/work/+([0-9]).+([0-9]) )
+		else
+			# Otherwise it's must be a Job Instance dir
+			instance_workdirs+=( "$1" )
+		fi
+		shift
+	done
+	
+	
+	# Signal Job Instance processes
+	for instancedir in "${instance_workdirs[@]}"
+	do
+		# Filter for active Job Instances only
+		if is_locked "$instancedir/pid"
+		then
+			# First inform Job Instance process about termination
+			instancepid=`cat "$instancedir/pid"`
+			# Normally Job Instance process waits until Job Attempt exits.
+			# So it's okay here to assume Instance process is running under this pid.
+			# TODO take into account when Instance exits before Job Attempt.
+			kill -s TERM $instancepid
+			pending_instances[$instancedir]=$instancepid
+			active_instance_workdirs+=("$instancedir")
+		fi
+	done
+	signal_time=`date +%s`
+	
+	
+	while true
+	do
+		for instancedir in "${!pending_instances[@]}"
+		do
+			if ! is_locked "$instancedir/pid"
+			then
+				unset "pending_instances[$instancedir]"
+			fi
+		done
+		
+		if [ ${#pending_instances[@]} = 0 ]
+		then
+			break
+		fi
+		
+		echo "Wait for termination (${#pending_instances[@]}/${#active_instance_workdirs[@]})" >&2
+		
+		if [ $terminate_pgroup = yes -a $pgroup_signal_sent = no ]
+		then
+			if [ $[signal_time + pgroup_kill_delay] -le `date +%s` ]
+			then
+				echo "Terminate Job's Process Group" >&2
+				
+				for instancedir in "${!pending_instances[@]}"
+				do
+					attemptpidfile=`find_last_attempt_pidfile "$instancedir"`
+					if is_locked "$attemptpidfile"
+					then
+						attemptpid=`cat "$attemptpidfile"`
+						if [ -n "$attemptpid" ]
+						then
+							kill -s TERM -- -$attemptpid
+						fi
+					fi
+				done
+				
+				pgroup_signal_sent=yes
+			fi
+		fi
+		
+		sleep $check_interval
+	done
+	;;
+
+*)
+	echo "cronshctl [ls | stop]" >&2
+	exit 1
 	;;
 esac
