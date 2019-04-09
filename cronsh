@@ -336,11 +336,10 @@ do
 done
 
 # TODO
-# copy script to enable editing in the meanwhile
 # preconditions
 # CRONSH_SHOULD_RUN time spec
 # emulate terminal, attach/detach
-# invocation: recursive
 # timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE
+# invocation: recursive
 # verbose/debug mode
 # detect config change and reload
