@@ -24,10 +24,10 @@ find_last_attempt_number()
 {
 	find "$1" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1
 }
-find_last_attempt_pid()
+find_last_attempt_pidfile()
 {
 	local lastattempt=`find_last_attempt_number "$1"`
-	cat "$1/attempt-$lastattempt/pid"
+	echo "$1/attempt-$lastattempt/pid"
 }
 find_current_attempt_pid()
 {
@@ -206,7 +206,10 @@ stop)
 		then
 			# First inform Job Instance process about termination
 			instancepid=`cat "$instancedir/pid"`
-			kill -s TERM $instancepid  # FIXME it may kill unrelated process who reused this pid
+			# Normally Job Instance process waits until Job Attempt exits.
+			# So it's okay here to assume Instance process is running under this pid.
+			# TODO take into account when Instance exits before Job Attempt.
+			kill -s TERM $instancepid
 			pending_instances[$instancedir]=$instancepid
 			active_instance_workdirs+=("$instancedir")
 		fi
@@ -239,10 +242,14 @@ stop)
 				
 				for instancedir in "${!pending_instances[@]}"
 				do
-					attemptpid=`find_last_attempt_pid "$instancedir"`
-					if [ -n "$attemptpid" ]
+					attemptpidfile=`find_last_attempt_pidfile "$instancedir"`
+					if is_locked "$attemptpidfile"
 					then
-						kill -s TERM -- -$attemptpid  # FIXME sometimes not exists
+						attemptpid=`cat "$attemptpidfile"`
+						if [ -n "$attemptpid" ]
+						then
+							kill -s TERM -- -$attemptpid
+						fi
 					fi
 				done
 				

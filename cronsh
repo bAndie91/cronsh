@@ -43,7 +43,7 @@ set +e +u
 [ ! -e config ] || . config
 
 
-# Override config variables with ones passed by CLI args
+# Override config variables with ones passed in CLI args
 for var in "${!config_override[@]}"
 do
 	value=${config_override[$var]}
@@ -277,11 +277,13 @@ do
 	
 	if [ "$CRONSH_CAUGHT_SIGNAL" = yes ]
 	then
+		# Term or Int signal is caught during waiting Job process to finish.
+		# Wait for Job's process group to exit.
 		trap '' TERM
 		trap 'kill -s TERM -- -$CRONSH_ATTEMPT_PGID' INT
 		if is_pgid_exists $CRONSH_ATTEMPT_PGID
 		then
-			note "wait Job Progress Group to terminate"
+			note "wait Job Progress Group to exit (Ctrl-C again to terminate pgrp)"
 			while is_pgid_exists $CRONSH_ATTEMPT_PGID
 			do
 				command sleep 0.5
@@ -313,6 +315,8 @@ do
 done
 
 # TODO
+# setsid / pgrphack (from daemontools) / cronsh_setpgrp
+# copy script to enable editing in the meanwhile
 # preconditions
 # CRONSH_SHOULD_RUN time spec
 # emulate terminal, attach/detach
