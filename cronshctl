@@ -238,7 +238,7 @@ stop)
 		then
 			if [ $[signal_time + pgroup_kill_delay] -le `date +%s` ]
 			then
-				echo "Terminate Job's Process Group" >&2
+				echo "Terminating Job Process Group(s)" >&2
 				
 				for instancedir in "${!pending_instances[@]}"
 				do
