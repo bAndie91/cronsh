@@ -28,7 +28,6 @@ done
 
 # Set Job directory
 set -e -u
-shopt -s nullglob
 enable kill
 CRONSH_JOBDIR=$1
 if [ "${CRONSH_JOBDIR:0:1}" = / ]
@@ -248,20 +247,11 @@ do
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
 	
-	preconditions_err=0
-	for condition_script in "$CRONSH_JOBDIR_ABS"/condition/*
-	do
-		. "$condition_script"
-		preconditions_err=$?
-		if [ $preconditions_err != 0 ]
-		then
-			break
-		fi
-	done
+	run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition
+	preconditions_err=$?
 	
 	if [ $preconditions_err = 0 ]
 	then
-		
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 		then
 			sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}` random delay before an attempt
