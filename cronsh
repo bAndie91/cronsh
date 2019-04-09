@@ -270,7 +270,7 @@ do
 		renice -n "$CRONSH_NICE" -p $$ >/dev/null
 		ionice "$CRONSH_IONICE_CLASS" ${CRONSH_IONICE_CLASSDATA:+-n "$CRONSH_IONICE_CLASSDATA"} -p $$
 		
-		exec setsid bash -c '
+		exec cronsh_setpgrp bash -c '
 			set -e;
 			pidfile=$CRONSH_WORKDIR_ABS/pid;
 			exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
@@ -328,7 +328,6 @@ do
 done
 
 # TODO
-# setsid / pgrphack (from daemontools) / cronsh_setpgrp
 # copy script to enable editing in the meanwhile
 # preconditions
 # CRONSH_SHOULD_RUN time spec
