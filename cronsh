@@ -108,6 +108,13 @@ check_deadline()
 		exit_cronsh
 	fi
 }
+check_signal()
+{
+	if [ $CRONSH_CAUGHT_SIGNAL = yes ]
+	then
+		exit_cronsh
+	fi
+}
 random_range()
 {
 	echo $[RANDOM % ($2 + 1 - $1) + $1]
@@ -312,14 +319,11 @@ do
 			done
 		fi
 		CRONSH_ATTEMPT_PGID=''
-		
-		if [ $CRONSH_CAUGHT_SIGNAL = yes ]
-		then
-			exit_cronsh
-		fi
 	else
 		note "preconditions are not met"
 	fi
+	
+	check_signal
 	
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
@@ -338,6 +342,7 @@ do
 		
 		sleep $CRONSH_ATTEMPTS_INTERVAL between attempts
 		
+		check_signal
 		check_timeout
 		check_deadline
 	fi
