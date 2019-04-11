@@ -257,6 +257,8 @@ do
 	run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition
 	preconditions_err=$?
 	
+	check_signal
+	
 	if [ $preconditions_err = 0 ]
 	then
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
