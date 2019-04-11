@@ -7,6 +7,8 @@ CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_INTERVAL=0
+CRONSH_JOB_TIMEOUT=0
+CRONSH_JOB_DEADLINE_DATESTR=''
 CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
 CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
 CRONSH_ENABLE=yes
@@ -119,13 +121,13 @@ random_range()
 {
 	echo $[RANDOM % ($2 + 1 - $1) + $1]
 }
-sleep()
+delay()
 {
 	local t=$1
 	shift
 	[ "$t" != 0 ] || return
-	note "sleep $t: $*"
-	command sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
+	note "delay $t: $*"
+	sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
 
 is_pgid_exists()
@@ -198,6 +200,9 @@ CRONSH_LAST_STATUS=''
 CRONSH_ATTEMPTS_TIMEOUT=`to_sec $CRONSH_ATTEMPTS_TIMEOUT`
 CRONSH_ATTEMPTS_INTERVAL=`to_nsec $CRONSH_ATTEMPTS_INTERVAL`
 CRONSH_ATTEMPT_NUMBER=0
+CRONSH_JOB_DEADLINE=0
+[ -z "$CRONSH_JOB_DEADLINE_DATESTR" ] || CRONSH_JOB_DEADLINE=`date +%s -d "$CRONSH_JOB_DEADLINE_DATESTR"`
+CRONSH_JOB_TIMEOUT=`to_sec $CRONSH_JOB_TIMEOUT`
 if [ -n "${CRONSH_INSTANCE_RANDOM_DELAY[1]}" ]
 then
 	CRONSH_INSTANCE_RANDOM_DELAY[0]=`to_sec ${CRONSH_INSTANCE_RANDOM_DELAY[0]}`
@@ -236,7 +241,7 @@ set | grep -E ^CRONSH_ | sort | sed -e 's/^/env: /' >&2
 
 # Start the Job
 
-sleep `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}` random delay before starting job
+delay `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}` random delay before starting job
 
 [ ! -e pre-instance ] || . pre-instance
 
@@ -263,7 +268,7 @@ do
 	then
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 		then
-			sleep `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}` random delay before an attempt
+			delay `random_range ${CRONSH_ATTEMPTS_RANDOM_DELAY[@]}` random delay before an attempt
 			check_timeout
 			check_deadline
 		fi
@@ -300,6 +305,38 @@ do
 		CRONSH_ATTEMPT_PID=$!
 		CRONSH_ATTEMPT_PGID=$CRONSH_ATTEMPT_PID
 		
+		if [ $CRONSH_JOB_TIMEOUT != 0 -o $CRONSH_JOB_DEADLINE != 0 ]
+		then
+			# Setup a timeout timer to wait for TIMEOUT or until DEADLINE
+			# whichever comes first.
+			# Cancels timeout on termination.
+			(
+				now=`date +%s`
+				timeout_sec=$CRONSH_JOB_TIMEOUT
+				deadline_sec=$[CRONSH_JOB_DEADLINE == 0 ? 0 : CRONSH_JOB_DEADLINE - now]
+				if [ $timeout_sec != 0 -a \( $timeout_sec -lt $deadline_sec -o $deadline_sec = 0 \) ]
+				then
+					sleep_sec=$timeout_sec
+					code=3
+					msg="job timed out"
+				else
+					sleep_sec=$[deadline_sec < 0 ? 0 : deadline_sec]
+					code=4
+					msg="job deadline reached"
+				fi
+				trap 'kill $sleep_pid; exit 0' TERM
+				sleep $sleep_sec &
+				sleep_pid=$!
+				wait $sleep_pid
+				note "$msg"
+				kill -s TERM $CRONSH_ATTEMPT_PID
+				exit $code
+			) &
+			job_timeouter_pid=$!
+		else
+			job_timeouter_pid=''
+		fi
+		
 		while [ -d /proc/$CRONSH_ATTEMPT_PID ]
 		do
 			wait $CRONSH_ATTEMPT_PID
@@ -311,13 +348,26 @@ do
 		echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
 		note "exit status $CRONSH_LAST_STATUS at attempt $CRONSH_ATTEMPT_NUMBER"
 		
+		# Cancel job timeout timer
+		if [ -n "$job_timeouter_pid" ]
+		then
+			kill -s TERM $job_timeouter_pid 2>/dev/null
+			
+			# Check if job ended due to the timeout/deadline
+			wait $job_timeouter_pid
+			case $? in
+			3)	CRONSH_STOP_REASON=job-timeout;;
+			4)	CRONSH_STOP_REASON=job-deadline;;
+			esac
+		fi
+		
 		# Wait for Job's process group to exit.
 		if is_pgid_exists $CRONSH_ATTEMPT_PGID
 		then
 			note "wait Job Progress Group to exit (Ctrl-C to terminate pgrp)"
 			while is_pgid_exists $CRONSH_ATTEMPT_PGID
 			do
-				command sleep 0.5
+				sleep 0.5
 			done
 		fi
 		CRONSH_ATTEMPT_PGID=''
@@ -342,7 +392,7 @@ do
 		
 		[ ! -e post-attempt ] || . post-attempt
 		
-		sleep $CRONSH_ATTEMPTS_INTERVAL between attempts
+		delay $CRONSH_ATTEMPTS_INTERVAL between attempts
 		
 		check_signal
 		check_timeout
@@ -353,7 +403,6 @@ done
 # TODO
 # CRONSH_SHOULD_RUN time spec
 # emulate terminal, attach/detach
-# timeout ./job according to CRONSH_JOB_TIMEOUT and CRONSH_JOB_DEADLINE
 # invocation: recursive
 # verbose/debug mode
 # detect config change and reload
