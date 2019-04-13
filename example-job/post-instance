@@ -8,3 +8,4 @@
 # CRONSH_JOBDIR_ABS
 # CRONSH_WORKDIR_ABS
 # CRONSH_STOP_REASON
+#   possible values: attempt-timeout, attempt-deadline, attempt-limit, job-timeout, job-deadline, terminate, interrupt

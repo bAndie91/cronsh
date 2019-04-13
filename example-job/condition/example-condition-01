@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# put any script here.
+# these scripts will be evaulated in alphabetical order.
+# exit non-zero if a certain condition of your choice is not satisfied.
