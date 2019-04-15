@@ -402,6 +402,5 @@ done
 
 # TODO
 # CRONSH_SHOULD_RUN time spec
-# invocation: recursive
 # verbose/debug mode
 # detect config change and reload
