@@ -236,7 +236,7 @@ export CRONSH_LAST_STATUS
 
 
 # Display config variables
-set | grep -E ^CRONSH_ | sort | sed -e 's/^/env: /' >&2
+#set | grep -E ^CRONSH_ | sort | sed -e 's/^/env: /' >&2
 
 
 # Start the Job
@@ -402,7 +402,6 @@ done
 
 # TODO
 # CRONSH_SHOULD_RUN time spec
-# emulate terminal, attach/detach
 # invocation: recursive
 # verbose/debug mode
 # detect config change and reload
