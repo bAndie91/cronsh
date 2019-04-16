@@ -1,19 +1,70 @@
-# This file is basically a script sources in bash.
+# This file is basically a script sourced in by bash.
 # Technically you can put any complex logic here, but 
 # please keep only simple "variable=value" statements here.
 # Put your custom initialization login in 'pre-instance' file.
 
-CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
-CRONSH_ATTEMPTS_DEADLINE_DATESTR=12:00
-CRONSH_ATTEMPTS_INTERVAL=5min
-CRONSH_ATTEMPTS_MAX=0
-CRONSH_ATTEMPTS_TIMEOUT=1hour
-CRONSH_JOB_TIMEOUT=0
-CRONSH_JOB_DEADLINE_DATESTR=''
-CRONSH_INSTANCE_RANDOM_DELAY=(5sec 1min)
-CRONSH_ATTEMPTS_RANDOM_DELAY=(0 3sec)
+# CRONSH_NEW_INSTANCE_POLICY
+# options: run-multiple, avoid-new, queue-new, stop-old
+CRONSH_NEW_INSTANCE_POLICY=run-multiple
+
+# CRONSH_ENABLE
+# options: yes, no
+# when set to 'no' no new jobs will start
 CRONSH_ENABLE=yes
+
+# CRONSH_DISABLE_ON_FAIL
+# options: yes, no
+# when set to 'yes' if the overall job failed then cronsh will set CRONSH_ENABLE=no in config file
+CRONSH_DISABLE_ON_FAIL=no
+
+# CRONSH_ATTEMPTS_TIMEOUT
+# stop trying to run the job after this amount of time
+# example: CRONSH_ATTEMPTS_TIMEOUT=1hour
+# zero means no timeout
+CRONSH_ATTEMPTS_TIMEOUT=0
+
+# CRONSH_ATTEMPTS_DEADLINE_DATESTR
+# stop trying to run the job after this time (see date(1) '-d' option for valid expressions)
+# example: CRONSH_ATTEMPTS_DEADLINE_DATESTR="today 06:00"
+CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
+
+# CRONSH_ATTEMPTS_INTERVAL
+# wait this much time between attempts
+# example: CRONSH_ATTEMPTS_INTERVAL=5min
+CRONSH_ATTEMPTS_INTERVAL=0
+
+# CRONSH_ATTEMPTS_MAX
+# try to run the job at most this many times
+# zero means no limit
+CRONSH_ATTEMPTS_MAX=1
+
+# CRONSH_INSTANCE_RANDOM_DELAY
+# bash array
+# wait random amount of time before attempt to start the job before 'pre-instance' stage
+# you may specify an upper limit of randomness or a range
+# example: CRONSH_INSTANCE_RANDOM_DELAY=5min
+# example: CRONSH_INSTANCE_RANDOM_DELAY=(5sec 1min)
+CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
+
+# CRONSH_ATTEMPTS_RANDOM_DELAY
+# bash array
+# wait random amount of time between each attempts before 'pre-attempt' stage
+# you may specify an upper limit of randomness or a range
+# example: CRONSH_ATTEMPTS_RANDOM_DELAY=5sec
+# example: CRONSH_ATTEMPTS_RANDOM_DELAY=(1sec 3sec)
+CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
+
+# CRONSH_JOB_TIMEOUT
+# once the actual job started, terminate after this much time
+# zero means never
+CRONSH_JOB_TIMEOUT=0
+
+# CRONSH_JOB_DEADLINE_DATESTR
+# once the actual job started, terminate on this time (see date(1) '-d' option for valid expressions)
+CRONSH_JOB_DEADLINE_DATESTR=''
+
+# CRONSH_NICE, CRONSH_IONICE_CLASS, CRONSH_IONICE_CLASSDATA
+# see nice(1), ionice(1)
 CRONSH_NICE=19
 CRONSH_IONICE_CLASS=idle
 CRONSH_IONICE_CLASSDATA=''
-CRONSH_DISABLE_ON_FAIL=no
