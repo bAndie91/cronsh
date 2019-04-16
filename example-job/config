@@ -4,8 +4,8 @@
 # Put your custom initialization login in 'pre-instance' file.
 
 # CRONSH_NEW_INSTANCE_POLICY
-# options: run-multiple, avoid-new, queue-new, stop-old
-CRONSH_NEW_INSTANCE_POLICY=run-multiple
+# options: allow-concurrent, deny-new, queue-new, stop-old
+CRONSH_NEW_INSTANCE_POLICY=allow-concurrent
 
 # CRONSH_ENABLE
 # options: yes, no

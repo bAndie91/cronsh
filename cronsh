@@ -2,7 +2,7 @@
 
 
 # Set variable defaults
-CRONSH_NEW_INSTANCE_POLICY=run-multiple
+CRONSH_NEW_INSTANCE_POLICY=allow-concurrent
 CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
@@ -188,10 +188,10 @@ msg_no_lock_ex="Can not acquire exclusive lock"
 msg_no_lock_sh="Can not acquire shared lock"
 
 case "$CRONSH_NEW_INSTANCE_POLICY" in
-run-multiple)
+allow-concurrent)
 	flock --shared --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_sh"
 	;;
-avoid-new)
+deny-new)
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
 	;;
 queue-new)
