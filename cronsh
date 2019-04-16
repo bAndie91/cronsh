@@ -2,7 +2,7 @@
 
 
 # Set variable defaults
-CRONSH_ALLOW_MULTIPLE_INSTANCES=yes
+CRONSH_NEW_INSTANCE_POLICY=run-multiple
 CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
@@ -184,12 +184,30 @@ fi
 
 
 # Acquire Lock
-if [ $CRONSH_ALLOW_MULTIPLE_INSTANCES = yes ]
-then
-	flock --shared --nonblock $CRONSH_LOCK_FD || die "Can not acquire shared lock"
-else
-	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "Can not acquire exclusive lock"
-fi
+msg_no_lock_ex="Can not acquire exclusive lock"
+msg_no_lock_sh="Can not acquire shared lock"
+
+case "$CRONSH_NEW_INSTANCE_POLICY" in
+run-multiple)
+	flock --shared --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_sh"
+	;;
+avoid-new)
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	;;
+queue-new)
+	note "Waiting in queue"
+	flock --exclusive $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	note "Lock acquired"
+	;;
+stop-old)
+	note "Stopping old Job Instnces if any"
+	cronshctl stop "$CRONSH_JOBDIR_ABS"
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	;;
+*)
+	die "Bad config: \$CRONSH_NEW_INSTANCE_POLICY=$CRONSH_NEW_INSTANCE_POLICY"
+	;;
+esac
 
 
 # Generate instance unique variables
