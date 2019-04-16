@@ -1,0 +1,3 @@
+# put config files here in 'config.d' directory.
+# they are sourced like 'config' file.
+# see details there.

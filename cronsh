@@ -17,6 +17,7 @@ CRONSH_IONICE_CLASS=idle
 CRONSH_IONICE_CLASSDATA=''
 CRONSH_CAUGHT_SIGNAL=no
 CRONSH_STOP_REASON=''
+CRONSH_DISABLE_ON_FAIL=no
 
 
 # Read config variables passed by CLI argumentum
@@ -28,9 +29,11 @@ do
 done
 
 
-# Set Job directory
+# Set shell options
 set -e -u
 enable kill
+shopt -s nullglob
+# Set Job directory
 CRONSH_JOBDIR=$1
 if [ "${CRONSH_JOBDIR:0:1}" = / ]
 then
@@ -46,6 +49,10 @@ set +e +u
 
 # Load the job's saved configuration
 [ ! -e config ] || . config
+for cfgfile in config.d/*
+do
+	. "$cfgfile"
+done
 
 
 # Override config variables with ones passed in CLI args
@@ -78,6 +85,18 @@ set +e
 exit_cronsh()
 {
 	[ ! -e post-instance ] || . post-instance
+	
+	if [ -n "$CRONSH_LAST_STATUS" -a "$CRONSH_LAST_STATUS" != 0 -a "$CRONSH_DISABLE_ON_FAIL" = yes ]
+	then
+		note "Disabling Job ..."
+		[ -d "$CRONSH_JOBDIR_ABS/config.d" ] || mkdir "$CRONSH_JOBDIR_ABS/config.d"
+		{
+			echo "# disabled due to a failure in job instance"
+			echo "# started at $(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$human_date_fmt_min") @$CRONSH_INSTANCE_START_TIMESTAMP_NS"
+			echo "# exit code $CRONSH_LAST_STATUS"
+			echo "CRONSH_ENABLE=no"
+		}>"$CRONSH_JOBDIR_ABS/config.d/99-disable"
+	fi
 	
 	if [ "$CRONSH_LAST_STATUS" != 0 ]
 	then
