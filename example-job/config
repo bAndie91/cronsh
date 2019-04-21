@@ -7,6 +7,16 @@
 # options: allow-concurrent, deny-new, queue-new, stop-old
 CRONSH_NEW_INSTANCE_POLICY=allow-concurrent
 
+# CRONSH_MAX_CONCURRENT_INSTANCES
+# limit of concurrently started Job Instances (makes sense only with CRONSH_NEW_INSTANCE_POLICY=allow-concurrent)
+# zero means no limit
+CRONSH_MAX_CONCURRENT_INSTANCES=0
+
+# CRONSH_INSTANCE_QUEUE_SIZE
+# how many Job Instances can wait in the queue (makes sense only with CRONSH_NEW_INSTANCE_POLICY=queue-new)
+# zero means unlimited queue
+CRONSH_INSTANCE_QUEUE_SIZE=0
+
 # CRONSH_ENABLE
 # options: yes, no
 # when set to 'no' no new jobs will start

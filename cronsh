@@ -3,6 +3,8 @@
 
 # Set variable defaults
 CRONSH_NEW_INSTANCE_POLICY=allow-concurrent
+CRONSH_MAX_CONCURRENT_INSTANCES=0
+CRONSH_INSTANCE_QUEUE_SIZE=0
 CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
@@ -149,11 +151,6 @@ delay()
 	sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
 }
 
-is_pgid_exists()
-{
-	kill -n 0 -- -$1 2>/dev/null
-}
-
 cronsh_signal()
 {
 	CRONSH_CAUGHT_SIGNAL=yes
@@ -172,9 +169,6 @@ cronsh_signal()
 	fi
 }
 
-trap 'cronsh_signal terminate' TERM
-trap 'cronsh_signal interrupt' INT
-
 
 
 if [ $CRONSH_ENABLE != yes ]
@@ -186,23 +180,67 @@ fi
 # Acquire Lock
 msg_no_lock_ex="Can not acquire exclusive lock"
 msg_no_lock_sh="Can not acquire shared lock"
+msg_lock_acq="Lock acquired"
 
 case "$CRONSH_NEW_INSTANCE_POLICY" in
 allow-concurrent)
+	if [ $CRONSH_MAX_CONCURRENT_INSTANCES != 0 ]
+	then
+		locks=`count_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || die
+		if [ $locks -ge $CRONSH_MAX_CONCURRENT_INSTANCES ]
+		then
+			die "Too many concurrent Jobs are running ($locks, max: $CRONSH_MAX_CONCURRENT_INSTANCES)"
+		fi
+	fi
 	flock --shared --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_sh"
 	;;
 deny-new)
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
 	;;
 queue-new)
+	if [ $CRONSH_INSTANCE_QUEUE_SIZE != 0 ]
+	then
+		pendlocks=`count_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || die
+		if [ $pendlocks -ge $CRONSH_INSTANCE_QUEUE_SIZE ]
+		then
+			die "Queue is exhausted ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
+		fi
+	fi
 	note "Waiting in queue"
 	flock --exclusive $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
-	note "Lock acquired"
+	note "$msg_lock_acq"
 	;;
 stop-old)
 	note "Stopping old Job Instnces if any"
-	cronshctl stop "$CRONSH_JOBDIR_ABS"
+	
+	job_terminator_pid=''
+	trap 'note Termination requested; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
+	
+	lockfile="$CRONSH_JOBDIR_ABS/stop-old.lock"
+	exec {CRONSH_STOPOLD_LOCK_FD}>>"$lockfile"
+	
+	if ! flock --exclusive --nonblock $CRONSH_STOPOLD_LOCK_FD
+	then
+		# stop other job instance which in in "lock acquisition" phase just like us now
+		kill `cat "$lockfile"`
+	fi
+	
+	flock --exclusive $CRONSH_STOPOLD_LOCK_FD || die "$msg_no_lock_ex"
+	echo $$ >"$lockfile"
+	
+	cronshctl stop "$CRONSH_JOBDIR_ABS" &
+	job_terminator_pid=$!
+	
+	while process_exists $job_terminator_pid
+	do
+		wait $job_terminator_pid
+	done
+	
+	flock --unlock $CRONSH_STOPOLD_LOCK_FD
+	trap - INT TERM
+	
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	note "$msg_lock_acq"
 	;;
 *)
 	die "Bad config: \$CRONSH_NEW_INSTANCE_POLICY=$CRONSH_NEW_INSTANCE_POLICY"
@@ -270,6 +308,11 @@ export CRONSH_JOBDIR_ABS
 export CRONSH_INSTANCE_START_TIMESTAMP
 export CRONSH_ATTEMPT_NUMBER
 export CRONSH_LAST_STATUS
+
+
+# Setup signal handlers
+trap 'cronsh_signal terminate' TERM
+trap 'cronsh_signal interrupt' INT
 
 
 # Display config variables
@@ -374,7 +417,7 @@ do
 			job_timeouter_pid=''
 		fi
 		
-		while [ -d /proc/$CRONSH_ATTEMPT_PID ]
+		while process_exists $CRONSH_ATTEMPT_PID
 		do
 			wait $CRONSH_ATTEMPT_PID
 			status=$?
@@ -401,7 +444,7 @@ do
 		# Wait for Job's process group to exit.
 		if is_pgid_exists $CRONSH_ATTEMPT_PGID
 		then
-			note "wait Job Progress Group to exit (Ctrl-C to terminate pgrp)"
+			note "wait Job Progress Group to exit (Ctrl-C to terminate process group)"
 			while is_pgid_exists $CRONSH_ATTEMPT_PGID
 			do
 				sleep 0.5
@@ -441,3 +484,5 @@ done
 # CRONSH_SHOULD_RUN time spec
 # verbose/debug mode
 # detect config change and reload
+# show "stopping-old" and "waiting-in-queue" jobs in 'cronshctl ls'
+	

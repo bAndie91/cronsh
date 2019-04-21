@@ -32,6 +32,48 @@ is_locked()
 {
 	[ -e "$1" ] && ! flock --nonblock --shared "$1" true
 }
+is_pgid_exists()
+{
+	kill -n 0 -- -$1 2>/dev/null
+}
+process_exists()
+{
+	[ -n "$1" -a -d /proc/"$1" ]
+}
+
+list_any_lock_on_inode()
+{
+	local inode=$1
+	# FIXME
+	# I ignore major and minor device num here
+	# because they do not add up for me:
+	# eg. stat(1) says 0x1b for a file but 
+	# /proc/locks has "00:11:..." entry
+	grep ":$inode " /proc/locks
+}
+count_locks_on_file()
+{
+	count_locks_on_inode `stat -c %i "$1"`
+}
+count_locks_on_inode()
+{
+	local inode=$1
+	if [ -z "$inode" ]; then return 1; fi
+	list_any_lock_on_inode "$inode" | grep -v '[-]>' -c
+	return 0
+}
+count_pending_locks_on_file()
+{
+	count_pending_locks_on_inode `stat -c %i "$1"`
+}
+count_pending_locks_on_inode()
+{
+	local inode=$1
+	if [ -z "$inode" ]; then return 1; fi
+	list_any_lock_on_inode "$inode" | grep '[-]>' -c
+	return 0
+}
+
 
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
