@@ -1,0 +1,4 @@
+# this is an environment file
+# put "variable=value" declarations here
+# those will be set in the job's environment
+# empty value makes the variable cleared from the environment, eg: "PATH="
