@@ -40,8 +40,23 @@ process_exists()
 {
 	[ -n "$1" -a -d /proc/"$1" ]
 }
+wait_status()
+{
+	local pid=$1
+	local status
+	while process_exists "$pid"
+	do
+		wait "$pid"
+		status=$?
+	done
+	return $status
+}
+get_parent_pid()
+{
+	ps o ppid= -p "$1" | tr -d " "
+}
 
-list_any_lock_on_inode()
+list_all_locks_on_inode()
 {
 	local inode=$1
 	# FIXME
@@ -59,7 +74,7 @@ count_locks_on_inode()
 {
 	local inode=$1
 	if [ -z "$inode" ]; then return 1; fi
-	list_any_lock_on_inode "$inode" | grep -v '[-]>' -c
+	list_all_locks_on_inode "$inode" | grep -v '[-]>' -c
 	return 0
 }
 count_pending_locks_on_file()
@@ -70,8 +85,23 @@ count_pending_locks_on_inode()
 {
 	local inode=$1
 	if [ -z "$inode" ]; then return 1; fi
-	list_any_lock_on_inode "$inode" | grep '[-]>' -c
+	list_all_locks_on_inode "$inode" | grep '[-]>' -c
 	return 0
+}
+list_pending_locks_on_inode()
+{
+	local inode=$1
+	if [ -z "$inode" ]; then return 1; fi
+	list_all_locks_on_inode "$inode" | grep '[-]>'
+	return 0
+}
+list_pending_locks_on_file()
+{
+	list_pending_locks_on_inode `stat -c %i "$1"`
+}
+get_pids_from_locks_list()
+{
+	awk '{if(/->/) {print $6} else {print $5}}'
 }
 
 get_stopold_lockfile_name()

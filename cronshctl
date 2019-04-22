@@ -107,7 +107,7 @@ ls)
 	
 	
 	# print header
-	fmt="%-4s\t%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
+	fmt="%-5s\t%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
 	printf "$fmt" STATE PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
 	
 	
@@ -149,6 +149,21 @@ ls)
 			fi
 		fi
 		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
+		
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+	done
+	
+	for pending_lock_pid in `list_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock" | get_pids_from_locks_list`
+	do
+		instance_state=QUEUE
+		# cronsh process is the parent of flock process which is pending on lock
+		instancepid=`get_parent_pid "$pending_lock_pid"`
+		instance_started_datestr=`ps o lstart= -p "$instancepid"`
+		started=`date +"$human_date_fmt_ls" -d "$instance_started_datestr"`
+		ended=''
+		laststatus=''
+		attemptpid=''
+		attempts=''
 		
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done

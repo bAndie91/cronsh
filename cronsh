@@ -204,13 +204,20 @@ queue-new)
 			die "Queue is exhausted ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
 		fi
 	fi
+	
+	trap 'note "Termination requested"; [ -n "$flock_pid" ] && kill $flock_pid; exit 1' INT TERM
 	note "Waiting in queue"
-	flock --exclusive $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	
+	flock --exclusive $CRONSH_LOCK_FD &
+	flock_pid=$!
+	wait_status $flock_pid || die "$msg_no_lock_ex"
+	
 	note "$msg_lock_acq"
+	trap - INT TERM
 	;;
 stop-old)
 	job_terminator_pid=''
-	trap 'note Termination requested; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
+	trap 'note "Termination requested"; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
 	
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	exec {CRONSH_STOPOLD_LOCK_FD}>>"$CRONSH_STOPOLD_LOCKFILE" || die "Failed to open lockfile: $CRONSH_STOPOLD_LOCKFILE"
@@ -222,7 +229,7 @@ stop-old)
 		kill `cat "$CRONSH_STOPOLD_LOCKFILE"`
 	fi
 	
-	note "Grabbing lock"
+	note "Grabbing auxiliary lock"
 	flock --exclusive $CRONSH_STOPOLD_LOCK_FD || die "$msg_no_lock_ex"
 	echo $$ >"$CRONSH_STOPOLD_LOCKFILE"
 	
@@ -230,10 +237,7 @@ stop-old)
 	cronshctl stop "$CRONSH_JOBDIR_ABS" &
 	job_terminator_pid=$!
 	
-	while process_exists $job_terminator_pid
-	do
-		wait $job_terminator_pid
-	done
+	wait_status $job_terminator_pid
 	
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
 	note "$msg_lock_acq"
@@ -416,12 +420,8 @@ do
 			job_timeouter_pid=''
 		fi
 		
-		while process_exists $CRONSH_ATTEMPT_PID
-		do
-			wait $CRONSH_ATTEMPT_PID
-			status=$?
-		done
-		CRONSH_LAST_STATUS=$status
+		wait_status $CRONSH_ATTEMPT_PID
+		CRONSH_LAST_STATUS=$?
 		CRONSH_ATTEMPT_PID=''
 		
 		echo -n $CRONSH_LAST_STATUS >"$CRONSH_WORKDIR/status"
@@ -483,5 +483,4 @@ done
 # CRONSH_SHOULD_RUN time spec
 # verbose/debug mode
 # detect config change and reload
-# show "waiting-in-queue" jobs in 'cronshctl ls'
 	
