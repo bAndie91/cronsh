@@ -342,12 +342,17 @@ do
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
 	
-	run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition
-	preconditions_err=$?
+	if [ -d "$CRONSH_JOBDIR_ABS"/condition ]
+	then
+		run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition
+		preconditions_err=$?
+	else
+		preconditions_err=''
+	fi
 	
 	check_signal
 	
-	if [ $preconditions_err = 0 ]
+	if [ "$preconditions_err" = 0 -o "$preconditions_err" = '' ]
 	then
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 		then
