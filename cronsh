@@ -46,6 +46,7 @@ fi
 cd "$CRONSH_JOBDIR"
 # Open file descriptor to lock later on
 exec {CRONSH_LOCK_FD}>>lock
+CRONSH_STOPOLD_LOCKFILE=$CRONSH_JOBDIR_ABS/stop-old.lock
 set +e +u
 
 
@@ -211,23 +212,23 @@ queue-new)
 	note "$msg_lock_acq"
 	;;
 stop-old)
-	note "Stopping old Job Instnces if any"
-	
 	job_terminator_pid=''
 	trap 'note Termination requested; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
 	
-	lockfile="$CRONSH_JOBDIR_ABS/stop-old.lock"
-	exec {CRONSH_STOPOLD_LOCK_FD}>>"$lockfile"
+	exec {CRONSH_STOPOLD_LOCK_FD}>>"$CRONSH_STOPOLD_LOCKFILE" || die "Failed to open lockfile: $CRONSH_STOPOLD_LOCKFILE"
 	
 	if ! flock --exclusive --nonblock $CRONSH_STOPOLD_LOCK_FD
 	then
 		# stop other job instance which in in "lock acquisition" phase just like us now
-		kill `cat "$lockfile"`
+		note "Stopping old Job Instnce in initialization phase"
+		kill `cat "$CRONSH_STOPOLD_LOCKFILE"`
 	fi
 	
+	note "Grabbing lock"
 	flock --exclusive $CRONSH_STOPOLD_LOCK_FD || die "$msg_no_lock_ex"
-	echo $$ >"$lockfile"
+	echo $$ >"$CRONSH_STOPOLD_LOCKFILE"
 	
+	note "Stopping old running Job Instnces if any"
 	cronshctl stop "$CRONSH_JOBDIR_ABS" &
 	job_terminator_pid=$!
 	
