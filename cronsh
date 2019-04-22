@@ -22,51 +22,6 @@ CRONSH_STOP_REASON=''
 CRONSH_DISABLE_ON_FAIL=no
 
 
-# Read config variables passed by CLI argumentum
-declare -A config_override
-while expr "$1" : '.\+=' >/dev/null
-do
-	config_override[${1%%=*}]=${1#*=}
-	shift
-done
-
-
-# Set shell options
-set -e -u
-enable kill
-shopt -s nullglob
-# Set Job directory
-CRONSH_JOBDIR=$1
-if [ "${CRONSH_JOBDIR:0:1}" = / ]
-then
-	CRONSH_JOBDIR_ABS=$CRONSH_JOBDIR
-else
-	CRONSH_JOBDIR_ABS=$PWD/$CRONSH_JOBDIR
-fi
-cd "$CRONSH_JOBDIR"
-# Open file descriptor to lock later on
-exec {CRONSH_LOCK_FD}>>lock
-CRONSH_STOPOLD_LOCKFILE=$CRONSH_JOBDIR_ABS/stop-old.lock
-set +e +u
-
-
-# Load the job's saved configuration
-[ ! -e config ] || . config
-for cfgfile in config.d/*
-do
-	. "$cfgfile"
-done
-
-
-# Override config variables with ones passed in CLI args
-for var in "${!config_override[@]}"
-do
-	value=${config_override[$var]}
-	eval "$var=\$value"
-done
-unset var value
-
-
 # Define subroutines
 
 set -e
@@ -172,6 +127,48 @@ cronsh_signal()
 
 
 
+# Read config variables passed by CLI arguments
+declare -A config_override
+while expr "$1" : '.\+=' >/dev/null
+do
+	config_override[${1%%=*}]=${1#*=}
+	shift
+done
+
+
+# Set shell options
+set -e -u
+enable kill
+shopt -s nullglob
+# Set Job directory
+CRONSH_JOBDIR=$1
+CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
+cd "$CRONSH_JOBDIR"
+# Open file descriptor to lock later on
+exec {CRONSH_LOCK_FD}>>lock
+set +e +u
+
+
+# Load the job's saved configuration
+[ ! -e config ] || . config
+for cfgfile in config.d/*
+do
+	. "$cfgfile"
+done
+
+
+# Override config variables with ones passed in CLI args
+for var in "${!config_override[@]}"
+do
+	value=${config_override[$var]}
+	eval "$var=\$value"
+done
+unset var value
+
+
+
+
+
 if [ $CRONSH_ENABLE != yes ]
 then
 	die "Job is disabled."
@@ -215,6 +212,7 @@ stop-old)
 	job_terminator_pid=''
 	trap 'note Termination requested; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
 	
+	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	exec {CRONSH_STOPOLD_LOCK_FD}>>"$CRONSH_STOPOLD_LOCKFILE" || die "Failed to open lockfile: $CRONSH_STOPOLD_LOCKFILE"
 	
 	if ! flock --exclusive --nonblock $CRONSH_STOPOLD_LOCK_FD
@@ -237,11 +235,11 @@ stop-old)
 		wait $job_terminator_pid
 	done
 	
-	flock --unlock $CRONSH_STOPOLD_LOCK_FD
-	trap - INT TERM
-	
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
 	note "$msg_lock_acq"
+	
+	flock --unlock $CRONSH_STOPOLD_LOCK_FD
+	trap - INT TERM
 	;;
 *)
 	die "Bad config: \$CRONSH_NEW_INSTANCE_POLICY=$CRONSH_NEW_INSTANCE_POLICY"
@@ -485,5 +483,5 @@ done
 # CRONSH_SHOULD_RUN time spec
 # verbose/debug mode
 # detect config change and reload
-# show "stopping-old" and "waiting-in-queue" jobs in 'cronshctl ls'
+# show "waiting-in-queue" jobs in 'cronshctl ls'
 	

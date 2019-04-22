@@ -89,6 +89,8 @@ ls)
 	[ -d "$1" ] || { usage; exit 2; }
 	CRONSH_JOBDIR=$1
 	shift
+	CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
+	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	cd "$CRONSH_JOBDIR/work" || die
 	
 	all_instances=(+([0-9]).+([0-9]))
@@ -105,8 +107,8 @@ ls)
 	
 	
 	# print header
-	fmt="%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
-	printf "$fmt" PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
+	fmt="%-4s\t%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
+	printf "$fmt" STATE PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
 	
 	
 	for instancedir in "${show_instances[@]}"
@@ -115,8 +117,10 @@ ls)
 		
 		if is_locked $instancedir/pid
 		then
+			instance_state=RUN
 			instancepid=`cat "$instancedir/pid" 2>/dev/null`
 		else
+			instance_state=TERM
 			if [ $show_active_only = yes ]
 			then
 				continue
@@ -146,8 +150,22 @@ ls)
 		fi
 		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
 		
-		printf "$fmt" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done
+	
+	if is_locked "$CRONSH_STOPOLD_LOCKFILE"
+	then
+		instance_state=INIT
+		instancepid=`cat "$CRONSH_STOPOLD_LOCKFILE"`
+		instance_started_nsec=`stat -c %Y "$CRONSH_STOPOLD_LOCKFILE"`
+		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
+		ended=''
+		laststatus=''
+		attemptpid=''
+		attempts=''
+		
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+	fi
 	;;
 
 stop)

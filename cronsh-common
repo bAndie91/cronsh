@@ -74,6 +74,22 @@ count_pending_locks_on_inode()
 	return 0
 }
 
+get_stopold_lockfile_name()
+{
+	if [ -z "$CRONSH_JOBDIR_ABS" ]; then return 1; fi
+	echo "$CRONSH_JOBDIR_ABS/stop-old.lock"
+}
+mk_abs_path()
+{
+	if [ "${1:0:1}" = / ]
+	then
+		echo "$1"
+	else
+		echo "$PWD/$1"
+	fi
+}
+
+
 
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
