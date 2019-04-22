@@ -378,10 +378,11 @@ do
 			
 			cd "$CRONSH_WORKDIR"
 			
-			renice -n "$CRONSH_NICE" -p $$ >/dev/null
-			ionice -c "$CRONSH_IONICE_CLASS" ${CRONSH_IONICE_CLASSDATA:+-n "$CRONSH_IONICE_CLASSDATA"} -p $$
-			
-			exec cronsh_setpgrp bash -c '
+			exec \
+			nice -n "$CRONSH_NICE" \
+			ionice -c "$CRONSH_IONICE_CLASS" ${CRONSH_IONICE_CLASSDATA:+-n "$CRONSH_IONICE_CLASSDATA"} \
+			cronsh_setpgrp \
+			bash -c '
 				set -e;
 				pidfile=$CRONSH_WORKDIR_ABS/pid;
 				exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
