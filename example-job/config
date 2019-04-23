@@ -17,6 +17,13 @@ CRONSH_MAX_CONCURRENT_INSTANCES=0
 # zero means unlimited queue
 CRONSH_INSTANCE_QUEUE_SIZE=0
 
+# CRONSH_MIN_REST_INTERVAL CRONSH_MIN_REST_INTERVAL_SUCCESS CRONSH_MIN_REST_INTERVAL_FAILED
+# disallow to start for this much time after last (successful, unsuccessful, either) job instance end
+# zero means no restriction
+CRONSH_MIN_REST_INTERVAL=0
+CRONSH_MIN_REST_INTERVAL_SUCCESS=0
+CRONSH_MIN_REST_INTERVAL_FAILED=0
+
 # CRONSH_ENABLE
 # options: yes, no
 # when set to 'no' no new jobs will start

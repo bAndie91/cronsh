@@ -20,6 +20,9 @@ CRONSH_IONICE_CLASSDATA=''
 CRONSH_CAUGHT_SIGNAL=no
 CRONSH_STOP_REASON=''
 CRONSH_DISABLE_ON_FAIL=no
+CRONSH_MIN_REST_INTERVAL=0
+CRONSH_MIN_REST_INTERVAL_SUCCESS=0
+CRONSH_MIN_REST_INTERVAL_FAILED=0
 
 
 # Define subroutines
@@ -175,6 +178,18 @@ unset var value
 if [ $CRONSH_ENABLE != yes ]
 then
 	die "Job is disabled."
+fi
+
+now=`date +%s`
+last_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/latest-instance-end"`
+last_successful_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`
+last_unsuccessful_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/latest-unsuccessful-instance-end"`
+CRONSH_MIN_REST_INTERVAL=`to_sec "$CRONSH_MIN_REST_INTERVAL"`
+CRONSH_MIN_REST_INTERVAL_SUCCESS=`to_sec "$CRONSH_MIN_REST_INTERVAL_SUCCESS"`
+CRONSH_MIN_REST_INTERVAL_FAILED=`to_sec "$CRONSH_MIN_REST_INTERVAL_FAILED"`
+if [ $now -lt $[last_instance_end + CRONSH_MIN_REST_INTERVAL] -o $now -lt $[last_successful_instance_end + CRONSH_MIN_REST_INTERVAL_SUCCESS] -o $now -lt $[last_unsuccessful_instance_end + CRONSH_MIN_REST_INTERVAL_FAILED] ]
+then
+	die "It's rest time."
 fi
 
 

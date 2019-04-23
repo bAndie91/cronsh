@@ -136,6 +136,18 @@ write_instance_history()
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
 		mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
+	else
+		mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-unsuccessful-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
+	fi
+}
+get_timestamp_sec_or_zero()
+{
+	local ts=`cat "$1" 2>/dev/null`
+	if [ -z "$ts" ]
+	then
+		echo 0
+	else
+		echo ${ts%.*}
 	fi
 }
 
