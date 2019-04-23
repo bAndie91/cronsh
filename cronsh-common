@@ -119,6 +119,16 @@ mk_abs_path()
 	fi
 }
 
+write_instance_history()
+{
+	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS	$CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/history"
+	true >>"$CRONSH_JOBDIR_ABS/latest-instance-end"
+	if [ "$CRONSH_LAST_STATUS" = 0 ]
+	then
+		true >>"$CRONSH_JOBDIR_ABS/latest-successful-instance-end"
+	fi
+}
+
 
 
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"

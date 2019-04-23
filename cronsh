@@ -42,6 +42,8 @@ set +e
 
 exit_cronsh()
 {
+	write_instance_history
+	
 	[ ! -e post-instance ] || . post-instance
 	
 	if [ -n "$CRONSH_LAST_STATUS" -a "$CRONSH_LAST_STATUS" != 0 -a "$CRONSH_DISABLE_ON_FAIL" = yes ]
@@ -374,6 +376,7 @@ do
 			do
 				ln -sfn "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "$CRONSH_WORKDIR_BASE/$(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$datefmt")"
 				ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP_NS +"$datefmt")"
+				ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"
 			done
 			
 			cd "$CRONSH_WORKDIR"
