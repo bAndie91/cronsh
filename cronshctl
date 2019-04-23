@@ -129,7 +129,7 @@ ls)
 		fi
 		
 		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
-		ended=`date +"$human_date_fmt_ls" -r "$instancedir/end" 2>/dev/null`
+		ended=`date +"$human_date_fmt_ls" -d "@$(cat "$instancedir/end" 2>/dev/null)" 2>/dev/null`
 		attempts=`find_last_attempt_number "$instancedir"`
 		
 		if [ -e "$instancedir/attempt-$attempts/status" ]

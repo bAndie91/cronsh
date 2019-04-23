@@ -119,13 +119,23 @@ mk_abs_path()
 	fi
 }
 
+mk_timestamp_file()
+{
+	local file=$1
+	local timestamp=$2
+	if [ -z "$timestamp" ]
+	then
+		timestamp=`date +%s.%N`
+	fi
+	echo -n "$timestamp" >"$file"
+}
 write_instance_history()
 {
 	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS	$CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/history"
-	true >>"$CRONSH_JOBDIR_ABS/latest-instance-end"
+	mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
-		true >>"$CRONSH_JOBDIR_ABS/latest-successful-instance-end"
+		mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
 	fi
 }
 

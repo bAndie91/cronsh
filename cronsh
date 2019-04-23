@@ -42,8 +42,6 @@ set +e
 
 exit_cronsh()
 {
-	write_instance_history
-	
 	[ ! -e post-instance ] || . post-instance
 	
 	if [ -n "$CRONSH_LAST_STATUS" -a "$CRONSH_LAST_STATUS" != 0 -a "$CRONSH_DISABLE_ON_FAIL" = yes ]
@@ -58,14 +56,17 @@ exit_cronsh()
 		}>"$CRONSH_JOBDIR_ABS/config.d/99-disable"
 	fi
 	
+	CRONSH_INSTANCE_END_TIMESTAMP_NS=`date +%s.%N`
+	CRONSH_INSTANCE_END_TIMESTAMP=${CRONSH_INSTANCE_END_TIMESTAMP_NS%.*}
+	mk_timestamp_file "$CRONSH_INSTANCE_WORKDIR/end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
+	write_instance_history
+	
 	if [ "$CRONSH_LAST_STATUS" != 0 ]
 	then
 		[ ! -e failure ] || ./failure
 	else
 		[ ! -e success ] || ./success
 	fi
-	
-	echo -n '' >"$CRONSH_INSTANCE_WORKDIR/end"
 	
 	exit ${CRONSH_LAST_STATUS:-255}
 }
@@ -256,6 +257,8 @@ esac
 # Generate instance unique variables
 CRONSH_INSTANCE_START_TIMESTAMP_NS=`date +%s.%N`
 CRONSH_INSTANCE_START_TIMESTAMP=${CRONSH_INSTANCE_START_TIMESTAMP_NS%.*}
+CRONSH_INSTANCE_END_TIMESTAMP_NS=''
+CRONSH_INSTANCE_END_TIMESTAMP=''
 CRONSH_WORKDIR_BASE=work
 CRONSH_ATTEMPTS_BASEDIR=$CRONSH_WORKDIR_BASE/$CRONSH_INSTANCE_START_TIMESTAMP_NS
 CRONSH_INSTANCE_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR
@@ -310,7 +313,10 @@ fi
 
 # Expose instance specific variables
 export CRONSH_JOBDIR_ABS
+export CRONSH_INSTANCE_START_TIMESTAMP_NS
 export CRONSH_INSTANCE_START_TIMESTAMP
+export CRONSH_INSTANCE_END_TIMESTAMP_NS
+export CRONSH_INSTANCE_END_TIMESTAMP
 export CRONSH_ATTEMPT_NUMBER
 export CRONSH_LAST_STATUS
 
