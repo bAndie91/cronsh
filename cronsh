@@ -341,9 +341,6 @@ trap 'cronsh_signal terminate' TERM
 trap 'cronsh_signal interrupt' INT
 
 
-# Display config variables
-#set | grep -E ^CRONSH_ | sort | sed -e 's/^/env: /' >&2
-
 
 # Start the Job
 
@@ -509,8 +506,3 @@ do
 	fi
 done
 
-# TODO
-# CRONSH_SHOULD_RUN time spec
-# verbose/debug mode
-# detect config change and reload
-	
