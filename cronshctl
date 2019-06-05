@@ -299,3 +299,8 @@ stop)
 	exit 1
 	;;
 esac
+
+
+# TODO
+# cronshctl log (tail -f)
+# cronshctl ls -t TIME

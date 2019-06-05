@@ -131,7 +131,7 @@ mk_timestamp_file()
 }
 write_instance_history()
 {
-	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS	$CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/history"
+	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS	$CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/status-history"
 	mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
