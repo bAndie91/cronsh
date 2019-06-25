@@ -187,9 +187,39 @@ last_unsuccessful_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/la
 CRONSH_MIN_REST_INTERVAL=`to_sec "$CRONSH_MIN_REST_INTERVAL"`
 CRONSH_MIN_REST_INTERVAL_SUCCESS=`to_sec "$CRONSH_MIN_REST_INTERVAL_SUCCESS"`
 CRONSH_MIN_REST_INTERVAL_FAILED=`to_sec "$CRONSH_MIN_REST_INTERVAL_FAILED"`
-if [ $now -lt $[last_instance_end + CRONSH_MIN_REST_INTERVAL] -o $now -lt $[last_successful_instance_end + CRONSH_MIN_REST_INTERVAL_SUCCESS] -o $now -lt $[last_unsuccessful_instance_end + CRONSH_MIN_REST_INTERVAL_FAILED] ]
+can_run_soonest_ts=0
+can_run_soonest_atall=$[last_instance_end + CRONSH_MIN_REST_INTERVAL]
+can_run_soonest_bysuccess=$[last_successful_instance_end + CRONSH_MIN_REST_INTERVAL_SUCCESS]
+can_run_soonest_byfailed=$[last_unsuccessful_instance_end + CRONSH_MIN_REST_INTERVAL_FAILED]
+if [ $now -lt $can_run_soonest_atall ]
 then
-	die "It's rest time."
+	can_run_soonest_ts=$can_run_soonest_atall
+	last_run_ts=$last_instance_end
+	k=''
+fi
+if [ $now -lt $can_run_soonest_bysuccess ]
+then
+	if [ $can_run_soonest_ts -lt $can_run_soonest_bysuccess ]
+	then
+		can_run_soonest_ts=$can_run_soonest_bysuccess
+		last_run_ts=$last_successful_instance_end
+		k="successful"
+	fi
+fi
+if [ $now -lt $can_run_soonest_byfailed ]
+then
+	if [ $can_run_soonest_ts -lt $can_run_soonest_byfailed ]
+	then
+		can_run_soonest_ts=$can_run_soonest_byfailed
+		last_run_ts=$last_unsuccessful_instance_end
+		k="unsuccessful"
+	fi
+fi
+if [ $can_run_soonest_ts != 0 ]
+then
+	last_dt=`date -d@$last_run_ts`
+	next_dt=`date -d@$can_run_soonest_ts`
+	die "Last ${k:+$k }job was run $last_dt, next can run not earlier than $next_dt."
 fi
 
 
