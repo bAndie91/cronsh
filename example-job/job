@@ -1,3 +1,11 @@
 #!/bin/bash
 
 # this is the script doing the actual job
+
+{
+	# it's a good idea to enclose your entire script
+	# in curly brackets, so editing in runtime won't
+	# mess up shell's instruction pointer.
+	
+	exit 0
+}
