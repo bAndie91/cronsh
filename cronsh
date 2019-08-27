@@ -392,6 +392,8 @@ do
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
 	
+	echo -n $CRONSH_ATTEMPT_NUMBER >"$CRONSH_ATTEMPTS_BASEDIR/latest-attempt-num"
+	
 	if [ -d "$CRONSH_JOBDIR_ABS"/condition ]
 	then
 		run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition

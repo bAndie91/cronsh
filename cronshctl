@@ -22,7 +22,7 @@ set +e
 
 find_last_attempt_number()
 {
-	find "$1" -maxdepth 1 -name 'attempt-*' -printf "%f\n" | cut -f2 -d- | sort -n | tail -n 1
+	cat "$1/latest-attempt-num"
 }
 find_last_attempt_pidfile()
 {
