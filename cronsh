@@ -311,6 +311,7 @@ CRONSH_INSTANCE_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR
 # Save Job Instance's PID and setup logging
 set -e
 mkdir -p "$CRONSH_INSTANCE_WORKDIR"
+mk_symlinks_in_various_datetime_formats "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "$CRONSH_WORKDIR_BASE" $CRONSH_INSTANCE_START_TIMESTAMP_NS
 echo -n $$ >"$CRONSH_INSTANCE_WORKDIR/pid"
 exec {CRONSH_INSTANCE_LOCK_FD}>>"$CRONSH_INSTANCE_WORKDIR/pid"
 flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
@@ -422,12 +423,8 @@ do
 			exec 1> >(exec tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
 			exec 2> >(exec tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
 			
-			for datefmt in "$human_date_fmt_nsec" "$human_date_fmt_sec" "$human_date_fmt_min"
-			do
-				ln -sfn "$CRONSH_INSTANCE_START_TIMESTAMP_NS" "$CRONSH_WORKDIR_BASE/$(date -d @$CRONSH_INSTANCE_START_TIMESTAMP_NS +"$datefmt")"
-				ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/$(date -d @$CRONSH_ATTEMPT_START_TIMESTAMP_NS +"$datefmt")"
-				ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"
-			done
+			mk_symlinks_in_various_datetime_formats "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR" $CRONSH_ATTEMPT_START_TIMESTAMP_NS
+			ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"
 			
 			cd "$CRONSH_WORKDIR"
 			

@@ -150,6 +150,17 @@ get_timestamp_sec_or_zero()
 		echo ${ts%.*}
 	fi
 }
+mk_symlinks_in_various_datetime_formats()
+{
+	local datefmt
+	local target=$1
+	local basedir=$2
+	local timestamp=$3
+	for datefmt in "$human_date_fmt_nsec" "$human_date_fmt_sec" "$human_date_fmt_min"
+	do
+		ln -sfn "$target" "$basedir/$(date -d @$timestamp +"$datefmt")"
+	done
+}
 
 
 
