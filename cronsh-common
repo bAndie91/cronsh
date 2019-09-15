@@ -119,6 +119,13 @@ mk_abs_path()
 	fi
 }
 
+get_instance_relative_canonical_dir()
+{
+	local timestamp=$1
+	echo -n instance/
+	date +"%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N" -d @$timestamp
+}
+
 mk_timestamp_file()
 {
 	local file=$1
