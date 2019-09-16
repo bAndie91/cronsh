@@ -122,8 +122,7 @@ mk_abs_path()
 get_instance_relative_canonical_dir()
 {
 	local timestamp=$1
-	echo -n instance/
-	date +"%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N" -d @$timestamp
+	date +"instance/$CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE" -d @$timestamp
 }
 
 mk_timestamp_file()
@@ -170,9 +169,12 @@ mk_symlinks_in_various_datetime_formats()
 }
 
 
-
+# variables not exposed directly to user
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
 human_date_fmt_min="%Y-%m-%d_%H:%M"
 human_date_fmt_ls="%Y-%m-%d %H:%M"
 human_date_fmt_ls_width=16
+
+# variables user can configure
+CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE="%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N"

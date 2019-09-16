@@ -17,6 +17,13 @@ CRONSH_MAX_CONCURRENT_INSTANCES=0
 # zero means unlimited queue
 CRONSH_INSTANCE_QUEUE_SIZE=0
 
+# CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
+# strftime(3)-style string to construct path for individual instance workdir
+# it'll be created in <JOBDIR>/work/instance/
+# it's a good idea to have less deep path for jobs running rather rare, and deeper path for frequently running jobs
+# please keep at least '%s.%N' in it since it defines an instance more or less uniquely
+CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE="%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N"
+
 # CRONSH_MIN_REST_INTERVAL CRONSH_MIN_REST_INTERVAL_SUCCESS CRONSH_MIN_REST_INTERVAL_FAILED
 # disallow to start for this much time after last (successful, unsuccessful, either) job instance end
 # zero means no restriction
