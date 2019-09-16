@@ -86,9 +86,15 @@ ls)
 		shift
 	done
 	
-	[ -d "$1" ] || { usage; exit 2; }
-	CRONSH_JOBDIR=$1
-	shift
+	if [ $# = 0 ]
+	then
+		CRONSH_JOBDIR=.
+	else
+		CRONSH_JOBDIR=$1
+		shift
+	fi
+	
+	[ -d "$CRONSH_JOBDIR" ] || { usage; exit 2; }
 	CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	cd "$CRONSH_JOBDIR/work" || die
@@ -214,18 +220,28 @@ stop)
 		shift
 	done
 	
-	[ -d "$1" ] || { usage; exit 2; }
+	if [ $# = 0 ]
+	then
+		set -- .
+	fi
 	
 	while [ -n "$1" ]
 	do
+		[ -d "$1" ] || { usage; exit 2; }
+		
 		if [ -e "$1/lock" ]
 		then
 			# If there is a file called "lock" in the directory, we count it as a Job Root dir
 			# and add all instance directories to the list, as it'll be filtered later;
-			instance_workdirs+=( "$1"/work/+([0-9]).+([0-9]) )
-		else
+			echo "$1: searching instance dirs..." >&2
+			instance_workdirs+=($( find "$1"/work/instance -type d -exec sh -c 'd={}; find "$d" -mindepth 1 -maxdepth 1 -type f -name pid | grep -q .' \; -print -prune ))
+		elif [ -e "$1/pid" ]
+		then
 			# Otherwise it's must be a Job Instance dir
 			instance_workdirs+=( "$1" )
+		else
+			echo "$1: does not seem neither a job dir nor an instance dir" >&2
+			exit 3
 		fi
 		shift
 	done
