@@ -125,6 +125,11 @@ get_instance_relative_canonical_dir()
 	date +"instance/$CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE" -d @$timestamp
 }
 
+gather_all_instance_dirs()
+{
+	find "$1/instance" -type d -exec sh -c 'd={}; find "$d" -mindepth 1 -maxdepth 1 -type f -name pid | grep -q .' \; -print -prune
+}
+
 mk_timestamp_file()
 {
 	local file=$1
