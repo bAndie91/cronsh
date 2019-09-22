@@ -99,7 +99,9 @@ ls)
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	cd "$CRONSH_JOBDIR/work" || die
 	
+	IFS_=$IFS IFS=$'\n'
 	all_instances=($(gather_all_instance_dirs "."))
+	IFS=$IFS_
 	show_instances=("${all_instances[@]}")
 	
 	if [ -n "$show_last_n" ]
@@ -234,7 +236,9 @@ stop)
 			# If there is a file called "lock" in the directory, we count it as a Job Root dir
 			# and add all instance directories to the list, as it'll be filtered later;
 			echo "$1: searching instance dirs..." >&2
+			IFS_=$IFS IFS=$'\n'
 			instance_workdirs+=($(gather_all_instance_dirs "$1/work"))
+			IFS=$IFS_
 		elif [ -e "$1/pid" ]
 		then
 			# Otherwise it's must be a Job Instance dir
