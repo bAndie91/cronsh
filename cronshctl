@@ -100,15 +100,15 @@ ls)
 	cd "$CRONSH_JOBDIR/work" || die
 	
 	IFS_=$IFS IFS=$'\n'
-	all_instances=($(gather_all_instance_dirs "."))
+	all_instance_dirs=($(gather_all_instance_dirs "."))
 	IFS=$IFS_
-	show_instances=("${all_instances[@]}")
+	show_instance_dirs=("${all_instances[@]}")
 	
 	if [ -n "$show_last_n" ]
 	then
-		if [ $show_last_n -lt ${#all_instances[@]} ]
+		if [ $show_last_n -lt ${#all_instance_dirs[@]} ]
 		then
-			show_instances=()
+			show_instance_dirs=()
 			for ((i=show_last_n; i>=1; i--)) { show_instances+=("${all_instances[-$i]}"); }
 		fi
 	fi

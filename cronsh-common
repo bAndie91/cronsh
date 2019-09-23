@@ -127,7 +127,33 @@ get_instance_relative_canonical_dir()
 
 gather_all_instance_dirs()
 {
-	find "$1/instance" -type d -exec sh -c 'd={}; find "$d" -mindepth 1 -maxdepth 1 -type f -name pid | grep -q .' \; -printf "%T@ %p\n" -prune |\
+	DIR=$1 perl -e '
+		use Time::HiRes qw/stat/;
+		sub iter
+		{
+			my $selfdir = shift;
+			opendir my $dh, $selfdir;
+			while(readdir $dh)
+			{
+				next if /^\.\.?$/;
+				my $path = "$selfdir/$_";
+				if(-d $path)
+				{
+					if(-f "$path/pid")
+					{
+						$mtime = (stat $path)[9];
+						printf "%021.10f %s\n", $mtime, $path;
+					}
+					else
+					{
+						iter($path);
+					}
+				}
+			}
+			closedir $dh;
+		}
+		iter($ENV{"DIR"}."/instance");
+	' |\
 	sort | cut -d' ' -f1
 }
 
