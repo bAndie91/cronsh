@@ -125,36 +125,30 @@ get_instance_relative_canonical_dir()
 	date +"instance/$CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE" -d @$timestamp
 }
 
-gather_all_instance_dirs()
+register_instance_start()
 {
-	DIR=$1 perl -e '
-		use Time::HiRes qw/stat/;
-		sub iter
-		{
-			my $selfdir = shift;
-			opendir my $dh, $selfdir;
-			while(readdir $dh)
-			{
-				next if /^\.\.?$/;
-				my $path = "$selfdir/$_";
-				if(-d $path)
-				{
-					if(-f "$path/pid")
-					{
-						$mtime = (stat $path)[9];
-						printf "%021.10f %s\n", $mtime, $path;
-					}
-					else
-					{
-						iter($path);
-					}
-				}
-			}
-			closedir $dh;
-		}
-		iter($ENV{"DIR"}."/instance");
-	' |\
-	sort | cut -d' ' -f1
+	local instance_id=$1
+	local instance_dir=$2
+	echo "$instance_id $instance_dir" >>"$CRONSH_JOBDIR_ABS/instances-started"
+}
+
+gather_all_instance_ids()
+{
+	local jobdir=$1
+	cut -d' ' -f1 "$jobdir/instances-started"
+}
+
+get_instance_dir()
+{
+	local jobdir=$1
+	local instanceid=$2
+	grep "^$instanceid " "$jobdir/instances-started" | cut -d' ' -f2-
+}
+
+get_instance_start_nsec()
+{
+	# instance id does equal to nanosec timestamp of instance start
+	echo "$1"
 }
 
 mk_timestamp_file()
@@ -207,6 +201,8 @@ human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
 human_date_fmt_min="%Y-%m-%d_%H:%M"
 human_date_fmt_ls="%Y-%m-%d %H:%M"
 human_date_fmt_ls_width=16
+
+CRONSH_WORKDIR_BASE=work
 
 # variables user can configure
 CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE="%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N"

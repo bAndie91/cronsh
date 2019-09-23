@@ -22,7 +22,7 @@ CRONSH_INSTANCE_QUEUE_SIZE=0
 # it'll be created in <JOBDIR>/work/instance/
 # it's a good idea to have less deep path for jobs running rather rare, and deeper path for frequently running jobs
 # please keep at least '%s.%N' in it since it defines an instance more or less uniquely
-# please avoid IFS chars (space, tab, newline)
+# please avoid new-line/carriage-return chars
 CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE="%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N"
 
 # CRONSH_MIN_REST_INTERVAL CRONSH_MIN_REST_INTERVAL_SUCCESS CRONSH_MIN_REST_INTERVAL_FAILED

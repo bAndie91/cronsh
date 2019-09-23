@@ -97,19 +97,16 @@ ls)
 	[ -d "$CRONSH_JOBDIR" ] || { usage; exit 2; }
 	CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
-	cd "$CRONSH_JOBDIR/work" || die
 	
-	IFS_=$IFS IFS=$'\n'
-	all_instance_dirs=($(gather_all_instance_dirs "."))
-	IFS=$IFS_
-	show_instance_dirs=("${all_instances[@]}")
+	all_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
+	show_instance_ids=("${all_instance_ids[@]}")
 	
 	if [ -n "$show_last_n" ]
 	then
-		if [ $show_last_n -lt ${#all_instance_dirs[@]} ]
+		if [ $show_last_n -lt ${#all_instance_ids[@]} ]
 		then
-			show_instance_dirs=()
-			for ((i=show_last_n; i>=1; i--)) { show_instances+=("${all_instances[-$i]}"); }
+			show_instance_ids=()
+			for ((i=show_last_n; i>=1; i--)) { show_instance_ids+=("${all_instance_ids[-$i]}"); }
 		fi
 	fi
 	
@@ -119,9 +116,11 @@ ls)
 	printf "$fmt" STATE PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
 	
 	
-	for instancedir in "${show_instances[@]}"
+	# list started (and maybe terminated) instances
+	for instance_id in "${show_instance_ids[@]}"
 	do
-		instance_started_nsec=${instancedir##*/}
+		instance_started_nsec=`get_instance_start_nsec $instance_id`
+		instancedir=$CRONSH_JOBDIR/$CRONSH_WORKDIR_BASE/`get_instance_dir "$CRONSH_JOBDIR" $instance_id`
 		
 		if is_locked $instancedir/pid
 		then
@@ -142,11 +141,11 @@ ls)
 		
 		if [ -e "$instancedir/attempt-$attempts/status" ]
 		then
-			# this job attempt is ended
+			# last job attempt is ended
 			lastattempt=$attempts
 			attemptpid=''
 		else
-			# this job attempt is in progress
+			# latest job attempt is in progress
 			lastattempt=$[attempts - 1]
 			pidfile=$instancedir/attempt-$attempts/pid
 			if is_locked "$pidfile"
@@ -161,7 +160,8 @@ ls)
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done
 	
-	for pending_lock_pid in `list_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock" | get_pids_from_locks_list`
+	# list queued instances
+	for pending_lock_pid in `list_pending_locks_on_file "$CRONSH_JOBDIR/lock" | get_pids_from_locks_list`
 	do
 		instance_state=QUEUE
 		# cronsh process is the parent of flock process which is pending on lock
@@ -176,6 +176,7 @@ ls)
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done
 	
+	# list the instance (if any) which has not started yet but trying to stop its predecessor
 	if is_locked "$CRONSH_STOPOLD_LOCKFILE"
 	then
 		instance_state=INIT
@@ -237,7 +238,7 @@ stop)
 			# and add all instance directories to the list, as it'll be filtered later;
 			echo "$1: searching instance dirs..." >&2
 			IFS_=$IFS IFS=$'\n'
-			instance_workdirs+=($(gather_all_instance_dirs "$1/work"))
+			instance_workdirs+=($(gather_all_instance_dirs "$1/$CRONSH_WORKDIR_BASE"))
 			IFS=$IFS_
 		elif [ -e "$1/pid" ]
 		then
