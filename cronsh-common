@@ -7,7 +7,7 @@ die()
 }
 note()
 {
-	[ -z "$*" ] || echo "cronsh: <$CRONSH_JOBDIR> $*" >&2
+	[ -z "$*" ] || echo "cronsh: ${CRONSH_JOBDIR:+<$CRONSH_JOBDIR> }$*" >&2
 }
 to_sec()
 {
