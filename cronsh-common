@@ -151,6 +151,16 @@ get_instance_dir()
 	grep "^$instanceid " "$jobdir/instances-started" | cut -d' ' -f2-
 }
 
+get_fq_instance_dir()
+{
+	local jobdir=$1
+	local rel_dir=`get_instance_dir "$@"`
+	if [ -n "$rel_dir" ]
+	then
+		echo -n "$jobdir/$CRONSH_WORKDIR_BASE/$rel_dir"
+	fi
+}
+
 get_instance_start_nsec()
 {
 	# instance id does equal to nanosec timestamp of instance start

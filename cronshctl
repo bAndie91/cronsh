@@ -104,7 +104,7 @@ ls)
 		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR"))
 	elif [ -n "$show_last_n" ]
 	then
-		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR" | tail -n $show_last_n))
+		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR" | tail -n $show_last_n))
 	else
 		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
 	fi
@@ -119,7 +119,7 @@ ls)
 	for instance_id in "${show_instance_ids[@]}"
 	do
 		instance_started_nsec=`get_instance_start_nsec $instance_id`
-		instancedir=$CRONSH_JOBDIR/$CRONSH_WORKDIR_BASE/`get_instance_dir "$CRONSH_JOBDIR" $instance_id`
+		instancedir=`get_fq_instance_dir "$CRONSH_JOBDIR" $instance_id`
 		
 		if is_locked $instancedir/pid
 		then
@@ -240,7 +240,7 @@ stop)
 			echo "$jobdir: searching instance dirs..." >&2
 			for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
 			do
-				instance_workdirs+=(`get_instance_dir "$jobdir" "$instance_id"`)
+				instance_workdirs+=(`get_fq_instance_dir "$jobdir" "$instance_id"`)
 			done
 		elif [ -e "$1/pid" ]
 		then
