@@ -138,6 +138,12 @@ gather_all_instance_ids()
 	cut -d' ' -f1 "$jobdir/instances-started"
 }
 
+gather_non_terminated_instance_ids()
+{
+	local jobdir=$1
+	join -j1 -v1 <(gather_all_instance_ids "$jobdir") <(cut -f1 -d' ' "$jobdir/status-history" | sort)
+}
+
 get_instance_dir()
 {
 	local jobdir=$1
@@ -163,7 +169,7 @@ mk_timestamp_file()
 }
 write_instance_history()
 {
-	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS	$CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/status-history"
+	echo "$CRONSH_INSTANCE_START_TIMESTAMP_NS $CRONSH_LAST_STATUS" >>"$CRONSH_JOBDIR_ABS/status-history"
 	mk_timestamp_file "$CRONSH_JOBDIR_ABS/latest-instance-end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then

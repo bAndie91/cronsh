@@ -58,6 +58,7 @@ ls)
 	
 	show_last_n=''
 	show_active_only=yes
+	declare -a show_instance_ids
 	
 	while [ -n "$1" ]
 	do
@@ -98,16 +99,14 @@ ls)
 	CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	
-	all_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
-	show_instance_ids=("${all_instance_ids[@]}")
-	
-	if [ -n "$show_last_n" ]
+	if [ $show_active_only = yes ]
 	then
-		if [ $show_last_n -lt ${#all_instance_ids[@]} ]
-		then
-			show_instance_ids=()
-			for ((i=show_last_n; i>=1; i--)) { show_instance_ids+=("${all_instance_ids[-$i]}"); }
-		fi
+		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR"))
+	elif [ -n "$show_last_n" ]
+	then
+		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR" | tail -n $show_last_n))
+	else
+		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
 	fi
 	
 	
@@ -156,6 +155,7 @@ ls)
 			fi
 		fi
 		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
+		# TODO: get final status code from status-history file for TERM instances
 		
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
 	done
@@ -236,14 +236,16 @@ stop)
 		then
 			# If there is a file called "lock" in the directory, we count it as a Job Root dir
 			# and add all instance directories to the list, as it'll be filtered later;
-			echo "$1: searching instance dirs..." >&2
-			IFS_=$IFS IFS=$'\n'
-			instance_workdirs+=($(gather_all_instance_dirs "$1/$CRONSH_WORKDIR_BASE"))
-			IFS=$IFS_
+			jobdir=$1
+			echo "$jobdir: searching instance dirs..." >&2
+			for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
+			do
+				instance_workdirs+=(`get_instance_dir "$jobdir" "$instance_id"`)
+			done
 		elif [ -e "$1/pid" ]
 		then
 			# Otherwise it's must be a Job Instance dir
-			instance_workdirs+=( "$1" )
+			instance_workdirs+=("$1")
 		else
 			echo "$1: does not seem neither a job dir nor an instance dir" >&2
 			exit 3
@@ -262,7 +264,7 @@ stop)
 			instancepid=`cat "$instancedir/pid"`
 			# Normally Job Instance process waits until Job Attempt exits.
 			# So it's okay here to assume Instance process is running under this pid.
-			# TODO take into account when Instance exits before Job Attempt.
+			# TODO: take into account when Instance exits before Job Attempt.
 			kill -s TERM $instancepid
 			pending_instances[$instancedir]=$instancepid
 			active_instance_workdirs+=("$instancedir")
