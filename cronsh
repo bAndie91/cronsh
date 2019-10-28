@@ -45,6 +45,8 @@ set +e
 
 exit_cronsh()
 {
+	write_instance_history
+	
 	[ ! -e post-instance ] || . post-instance
 	
 	if [ -n "$CRONSH_LAST_STATUS" -a "$CRONSH_LAST_STATUS" != 0 -a "$CRONSH_DISABLE_ON_FAIL" = yes ]
@@ -62,7 +64,6 @@ exit_cronsh()
 	CRONSH_INSTANCE_END_TIMESTAMP_NS=`date +%s.%N`
 	CRONSH_INSTANCE_END_TIMESTAMP=${CRONSH_INSTANCE_END_TIMESTAMP_NS%.*}
 	mk_timestamp_file "$CRONSH_INSTANCE_WORKDIR_ABS/end" "$CRONSH_INSTANCE_END_TIMESTAMP_NS"
-	write_instance_history
 	ln -sfn "$CRONSH_INSTANCE_CANONICAL_DIR" "$CRONSH_WORKDIR_BASE/most-recent-ended"
 	
 	if [ "$CRONSH_LAST_STATUS" != 0 ]

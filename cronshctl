@@ -50,14 +50,20 @@ cmd=$1
 shift
 
 case "$cmd" in
-ls)
+ps)
 	usage()
 	{
-		echo "Usage: cronshctl ls [--last | -l [<N>]] [--all | -a] [<job-directory>]" >&2
+		echo "Usage: cronshctl ps [<options>] [<job-directory>]
+Options:
+ --last, -l [<N>]
+ --successful, -s
+ --failed, -f
+ --all, -a" >&2
 	}
 	
 	show_last_n=''
 	show_active_only=yes
+	show_by_status=no
 	declare -a show_instance_ids
 	
 	while [ -n "$1" ]
@@ -72,6 +78,16 @@ ls)
 			else
 				show_last_n=1
 			fi
+			;;
+		-s|--successful)
+			show_active_only=no
+			show_by_status_grep_flag=''
+			show_by_status=yes
+			;;
+		-f|--failed)
+			show_active_only=no
+			show_by_status_grep_flag='-v'
+			show_by_status=yes
 			;;
 		-a|--all)
 			show_active_only=no
@@ -102,11 +118,27 @@ ls)
 	if [ $show_active_only = yes ]
 	then
 		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR"))
-	elif [ -n "$show_last_n" ]
-	then
-		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR" | tail -n $show_last_n))
 	else
 		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
+	fi
+	
+	if [ $show_by_status = yes ]
+	then
+		show_instance_ids=(`join -j1 \
+			<(IFS=$'\n'; echo "${show_instance_ids[*]}") \
+			<(grep $show_by_status_grep_flag ' 0$' "$CRONSH_JOBDIR/status-history" | cut -f1 -d' ' | sort)
+		`)
+	fi
+	
+	if [ -n "$show_last_n" ] && [ $show_last_n -lt ${#show_instance_ids[@]} ]
+	then
+		show_instance_ids_=("${show_instance_ids[@]}")
+		show_instance_ids=()
+		for n in `seq $show_last_n -1 1`
+		do
+			show_instance_ids+=("${show_instance_ids_[-n]}")
+		done
+		unset show_instance_ids_
 	fi
 	
 	
@@ -318,7 +350,7 @@ stop)
 	;;
 
 *)
-	echo "cronshctl [ls | stop]" >&2
+	echo "cronshctl [ps | stop]" >&2
 	exit 1
 	;;
 esac
@@ -326,4 +358,5 @@ esac
 
 # TODO
 # cronshctl log (tail -f)
-# cronshctl ls -t TIME
+# cronshctl ps --start-time --end-time
+# cronshctl vars <JOBDIR>
