@@ -64,7 +64,7 @@ Options:
 	
 	show_last_n=''
 	show_active_only=yes
-	show_by_status=''
+	show_by_exitcode=''
 	show_workdir=''
 	declare -a show_instance_ids
 	
@@ -83,13 +83,13 @@ Options:
 			;;
 		-s|--successful)
 			show_active_only=no
-			show_by_status_grep_flag=''
-			show_by_status=yes
+			show_by_exitcode_grep_flag=''
+			show_by_exitcode=yes
 			;;
 		-f|--failed)
 			show_active_only=no
-			show_by_status_grep_flag='-v'
-			show_by_status=yes
+			show_by_exitcode_grep_flag='-v'
+			show_by_exitcode=yes
 			;;
 		-a|--all)
 			show_active_only=no
@@ -127,11 +127,11 @@ Options:
 		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
 	fi
 	
-	if [ "$show_by_status" = yes ]
+	if [ "$show_by_exitcode" = yes ]
 	then
 		show_instance_ids=(`join -j1 \
 			<(IFS=$'\n'; echo "${show_instance_ids[*]}") \
-			<(grep $show_by_status_grep_flag ' 0$' "$CRONSH_JOBDIR/status-history" | cut -f1 -d' ' | sort)
+			<(grep $show_by_exitcode_grep_flag ' 0$' "$CRONSH_JOBDIR/status-history" | cut -f1 -d' ' | sort)
 		`)
 	fi
 	
@@ -197,35 +197,38 @@ Options:
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
 	done
 	
-	# list queued instances
-	for pending_lock_pid in `list_pending_locks_on_file "$CRONSH_JOBDIR/lock" | get_pids_from_locks_list`
-	do
-		instance_state=QUEUE
-		# cronsh process is the parent of flock process which is pending on lock
-		instancepid=`get_parent_pid "$pending_lock_pid"`
-		instance_started_datestr=`ps o lstart= -p "$instancepid"`
-		started=`date +"$human_date_fmt_ls" -d "$instance_started_datestr"`
-		ended=''
-		laststatus=''
-		attemptpid=''
-		attempts=''
-		
-		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
-	done
-	
-	# list the instance (if any) which has not started yet but trying to stop its predecessor
-	if is_locked "$CRONSH_STOPOLD_LOCKFILE"
+	if [ "$show_by_exitcode" != yes ]
 	then
-		instance_state=INIT
-		instancepid=`cat "$CRONSH_STOPOLD_LOCKFILE"`
-		instance_started_nsec=`stat -c %Y "$CRONSH_STOPOLD_LOCKFILE"`
-		started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
-		ended=''
-		laststatus=''
-		attemptpid=''
-		attempts=''
+		# list queued instances
+		for pending_lock_pid in `list_pending_locks_on_file "$CRONSH_JOBDIR/lock" | get_pids_from_locks_list`
+		do
+			instance_state=QUEUE
+			# cronsh process is the parent of flock process which is pending on lock
+			instancepid=`get_parent_pid "$pending_lock_pid"`
+			instance_started_datestr=`ps o lstart= -p "$instancepid"`
+			started=`date +"$human_date_fmt_ls" -d "$instance_started_datestr"`
+			ended=''
+			laststatus=''
+			attemptpid=''
+			attempts=''
+			
+			printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+""}
+		done
 		
-		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
+		# list the instance (if any) which has not started yet but trying to stop its predecessor
+		if is_locked "$CRONSH_STOPOLD_LOCKFILE"
+		then
+			instance_state=INIT
+			instancepid=`cat "$CRONSH_STOPOLD_LOCKFILE"`
+			instance_started_nsec=`stat -c %Y "$CRONSH_STOPOLD_LOCKFILE"`
+			started=`date +"$human_date_fmt_ls" -d @$instance_started_nsec`
+			ended=''
+			laststatus=''
+			attemptpid=''
+			attempts=''
+			
+			printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+""}
+		fi
 	fi
 	;;
 
