@@ -58,12 +58,14 @@ Options:
  --last, -l [<N>]
  --successful, -s
  --failed, -f
- --all, -a" >&2
+ --all, -a
+ --work-directory" >&2
 	}
 	
 	show_last_n=''
 	show_active_only=yes
-	show_by_status=no
+	show_by_status=''
+	show_workdir=''
 	declare -a show_instance_ids
 	
 	while [ -n "$1" ]
@@ -92,6 +94,9 @@ Options:
 		-a|--all)
 			show_active_only=no
 			;;
+		--work-directory)
+			show_workdir=yes
+			;;
 		-h|--help)
 			usage
 			exit 0
@@ -115,14 +120,14 @@ Options:
 	CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
 	
-	if [ $show_active_only = yes ]
+	if [ "$show_active_only" = yes ]
 	then
 		show_instance_ids=($(gather_non_terminated_instance_ids "$CRONSH_JOBDIR"))
 	else
 		show_instance_ids=($(gather_all_instance_ids "$CRONSH_JOBDIR"))
 	fi
 	
-	if [ $show_by_status = yes ]
+	if [ "$show_by_status" = yes ]
 	then
 		show_instance_ids=(`join -j1 \
 			<(IFS=$'\n'; echo "${show_instance_ids[*]}") \
@@ -143,8 +148,8 @@ Options:
 	
 	
 	# print header
-	fmt="%-5s\t%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s\n"
-	printf "$fmt" STATE PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" "ATTEMPTS"
+	fmt="%-5s\t%5s\t%-${human_date_fmt_ls_width}s\t%-${human_date_fmt_ls_width}s\t%3s\t%5s\t%1s${show_workdir:+\t%s}\n"
+	printf "$fmt" STATE PID STARTED ENDED "LAST STATUS" "CURRENT ATTEMPT PID" ATTEMPTS ${show_workdir:+WORKDIR}
 	
 	
 	# list started (and maybe terminated) instances
@@ -159,7 +164,7 @@ Options:
 			instancepid=`cat "$instancedir/pid" 2>/dev/null`
 		else
 			instance_state=TERM
-			if [ $show_active_only = yes ]
+			if [ "$show_active_only" = yes ]
 			then
 				continue
 			fi
@@ -189,7 +194,7 @@ Options:
 		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
 		# TODO: get final status code from status-history file for TERM instances
 		
-		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
 	done
 	
 	# list queued instances
@@ -205,7 +210,7 @@ Options:
 		attemptpid=''
 		attempts=''
 		
-		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
 	done
 	
 	# list the instance (if any) which has not started yet but trying to stop its predecessor
@@ -220,7 +225,7 @@ Options:
 		attemptpid=''
 		attempts=''
 		
-		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts"
+		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
 	fi
 	;;
 
@@ -360,3 +365,4 @@ esac
 # cronshctl log (tail -f)
 # cronshctl ps --start-time --end-time
 # cronshctl vars <JOBDIR>
+# allow delete an instance's work dir
