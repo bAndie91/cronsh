@@ -32,7 +32,7 @@ for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/crons
 do
 	if [ -z "$libdir" ]
 	then
-		echo "can not source cronsh-common" >&2
+		echo "cronsh: can not source cronsh-common" >&2
 		false
 	fi
 	if [ -e "$libdir/cronsh-common" ]
@@ -138,12 +138,23 @@ cronsh_signal()
 
 
 # Read config variables passed by CLI arguments
+# TODO: get config from environment? (maybe unwanted when cronsh calls an other cronsh job)
 declare -A config_override
+varnameprefix=CRONSH_
 while expr "$1" : '.\+=' >/dev/null
 do
-	config_override[${1%%=*}]=${1#*=}
+	varname=${1%%=*}
+	if [ "${varname:0:${#varnameprefix}}" != "$varnameprefix" -o "${!varname+x}" != 'x' ]
+	then
+		echo "cronsh: invalid config variable: $varname" >&2
+		set -e
+		false
+	fi
+	config_override[$varname]=${1#*=}
 	shift
 done
+unset varname
+unset varnameprefix
 
 
 # Set shell options
@@ -431,6 +442,8 @@ do
 			
 			mk_symlinks_in_various_datetime_formats "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR" $CRONSH_ATTEMPT_START_TIMESTAMP_NS
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"
+			ln -sfn "$CRONSH_ATTEMPT_DIRNAME/stdout.txt" "$CRONSH_ATTEMPTS_BASEDIR/stdout-job.txt"
+			ln -sfn "$CRONSH_ATTEMPT_DIRNAME/stderr.txt" "$CRONSH_ATTEMPTS_BASEDIR/stderr-job.txt"
 			
 			cd "$CRONSH_WORKDIR"
 			
