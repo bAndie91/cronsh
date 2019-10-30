@@ -235,10 +235,29 @@ Options:
 log)
 	usage()
 	{
-		echo "Usage: cronshctl log [<job-directory> [...]]" >&2
+		echo "Usage: cronshctl log [-f] [<job-directory> [...]]" >&2
 	}
 	
 	logfiles=()
+	declare -A instance_pids=()
+	tail_follow=no
+	
+	while [ -n "$1" ]
+	do
+		case "$1" in
+		-f)
+			tail_follow=yes
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--)	shift; break;;
+		-*)	die "unknown option: $1";;
+		*)	break;;
+		esac
+		shift
+	done
 	
 	if [ $# = 0 ]
 	then
@@ -255,11 +274,44 @@ log)
 		for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
 		do
 			instance_dir=`get_fq_instance_dir "$jobdir" "$instance_id"`
+			instance_pids[`cat "$instance_dir"/pid`]=1
 			logfiles+=("$instance_dir"/std{err,out}{,-job}.txt)
 		done
 	done
 	
-	tail -q -F "${logfiles[@]}"
+	if [ ${#logfiles[@]} = 0 ]
+	then
+		note "no log file"
+		exit
+	fi
+	
+	parent_pid=$$
+	{
+		# wait while any instance is running
+		while kill -0 $parent_pid 2>/dev/null
+		do
+			for p in "${!instance_pids[@]}"
+			do
+				if ! kill -0 "$p" 2>/dev/null
+				then
+					unset "instance_pids[$p]"
+				fi
+			done
+			if [ ${#instance_pids[@]} = 0 ]
+			then
+				exit
+			fi
+			sleep 1
+		done
+	} &
+	
+	tail_opts=(-n +1)
+	if [ $tail_follow = yes ]
+	then
+		tail_opts+=(--pid=$! -F)
+	fi
+	
+	tail "${tail_opts[@]}" "${logfiles[@]}"
 	;;
 
 stop)
@@ -388,7 +440,7 @@ stop)
 	;;
 
 *)
-	echo "cronshctl [ps | stop]" >&2
+	echo "cronshctl [ps | stop | log]" >&2
 	exit 1
 	;;
 esac
@@ -400,3 +452,5 @@ esac
 # cronshctl vars <JOBDIR>
 # allow delete an instance's work dir
 # account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
+# cronsh: run detached in background
+# attach to job console
