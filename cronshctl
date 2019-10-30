@@ -285,25 +285,31 @@ log)
 		exit
 	fi
 	
-	parent_pid=$$
-	{
-		# wait while any instance is running
-		while kill -0 $parent_pid 2>/dev/null
-		do
-			for p in "${!instance_pids[@]}"
+	if [ $tail_follow = yes ]
+	then
+		# create a subprocess which does nothing but live until
+		# all of the job instances are running to let tail return
+		# when no more log update can happen.
+		parent_pid=$$
+		{
+			while kill -0 $parent_pid 2>/dev/null
 			do
-				if ! kill -0 "$p" 2>/dev/null
+				# wait while any instance is running
+				for p in "${!instance_pids[@]}"
+				do
+					if ! kill -0 "$p" 2>/dev/null
+					then
+						unset "instance_pids[$p]"
+					fi
+				done
+				if [ ${#instance_pids[@]} = 0 ]
 				then
-					unset "instance_pids[$p]"
+					exit
 				fi
+				sleep 1
 			done
-			if [ ${#instance_pids[@]} = 0 ]
-			then
-				exit
-			fi
-			sleep 1
-		done
-	} &
+		} &
+	fi
 	
 	tail_opts=(-n +1)
 	if [ $tail_follow = yes ]
