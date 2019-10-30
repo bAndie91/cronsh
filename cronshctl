@@ -232,6 +232,36 @@ Options:
 	fi
 	;;
 
+log)
+	usage()
+	{
+		echo "Usage: cronshctl log [<job-directory> [...]]" >&2
+	}
+	
+	logfiles=()
+	
+	if [ $# = 0 ]
+	then
+		set -- .
+	fi
+	
+	while [ -n "$1" ]
+	do
+		[ -d "$1" ] || { usage; exit 2; }
+		
+		jobdir=$1
+		shift
+		
+		for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
+		do
+			instance_dir=`get_fq_instance_dir "$jobdir" "$instance_id"`
+			logfiles+=("$instance_dir"/std{err,out}{,-job}.txt)
+		done
+	done
+	
+	tail -q -F "${logfiles[@]}"
+	;;
+
 stop)
 	usage()
 	{
@@ -369,3 +399,4 @@ esac
 # cronshctl ps --start-time --end-time
 # cronshctl vars <JOBDIR>
 # allow delete an instance's work dir
+# account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
