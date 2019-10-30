@@ -158,7 +158,7 @@ Options:
 		instance_started_nsec=`get_instance_start_nsec $instance_id`
 		instancedir=`get_fq_instance_dir "$CRONSH_JOBDIR" $instance_id`
 		
-		if is_locked $instancedir/pid
+		if is_locked "$instancedir/pid"
 		then
 			instance_state=RUN
 			instancepid=`cat "$instancedir/pid" 2>/dev/null`
@@ -235,12 +235,13 @@ Options:
 log)
 	usage()
 	{
-		echo "Usage: cronshctl log [-f] [<job-directory> [...]]" >&2
+		echo "Usage: cronshctl log [-f] <job-directory> [...]" >&2
 	}
 	
 	logfiles=()
 	declare -A instance_pids=()
 	tail_follow=no
+	nologfileyet_reported=no
 	
 	while [ -n "$1" ]
 	do
@@ -261,29 +262,44 @@ log)
 	
 	if [ $# = 0 ]
 	then
-		set -- .
+		usage
+		exit 2
+	else
+		args=("$@")
 	fi
 	
-	while [ -n "$1" ]
+	while true
 	do
-		[ -d "$1" ] || { usage; exit 2; }
-		
-		jobdir=$1
-		shift
-		
-		for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
+		for jobdir in "${args[@]}"
 		do
-			instance_dir=`get_fq_instance_dir "$jobdir" "$instance_id"`
-			instance_pids[`cat "$instance_dir"/pid`]=1
-			logfiles+=("$instance_dir"/std{err,out}{,-job}.txt)
+			[ -d "$jobdir" ] || { usage; exit 2; }
+			
+			for instance_id in `gather_running_instance_ids "$jobdir"`
+			do
+				instance_dir=`get_fq_instance_dir "$jobdir" "$instance_id"`
+				instance_pids[`cat "$instance_dir"/pid`]=1
+				logfiles+=("$instance_dir"/std{err,out}{,-job}.txt)
+			done
 		done
+		
+		if [ ${#logfiles[@]} = 0 ]
+		then
+			if [ $tail_follow = yes ]
+			then
+				if [ $nologfileyet_reported = no ]
+				then
+					note "no log file yet"
+					nologfileyet_reported=yes
+				fi
+				sleep 1
+			else
+				note "no log file"
+				exit
+			fi
+		else
+			break
+		fi
 	done
-	
-	if [ ${#logfiles[@]} = 0 ]
-	then
-		note "no log file"
-		exit
-	fi
 	
 	if [ $tail_follow = yes ]
 	then
@@ -323,7 +339,7 @@ log)
 stop)
 	usage()
 	{
-		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory> [<dir> [...]]]" >&2
+		echo "Usage: cronshctl stop [-g | --pgroup] [<job-directory> | <job-instance-directory>] [...]" >&2
 	}
 	
 	terminate_pgroup=no
@@ -353,7 +369,8 @@ stop)
 	
 	if [ $# = 0 ]
 	then
-		set -- .
+		usage
+		exit 2
 	fi
 	
 	while [ -n "$1" ]

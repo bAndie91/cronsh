@@ -144,6 +144,20 @@ gather_non_terminated_instance_ids()
 	join -j1 -v1 <(gather_all_instance_ids "$jobdir") <(cut -f1 -d' ' "$jobdir/status-history" | sort)
 }
 
+gather_running_instance_ids()
+{
+	local jobdir=$1
+	local idir
+	for jiid in `gather_non_terminated_instance_ids "$jobdir"`
+	do
+		idir=$jobdir/$CRONSH_WORKDIR_BASE/`get_instance_dir "$jobdir" "$jiid"`
+		if is_locked "$idir/pid"
+		then
+			echo "$jiid"
+		fi
+	done
+}
+
 get_instance_dir()
 {
 	local jobdir=$1
@@ -219,6 +233,7 @@ human_date_fmt_ls="%Y-%m-%d %H:%M"
 human_date_fmt_ls_width=16
 
 CRONSH_WORKDIR_BASE=work
+readonly CRONSH_WORKDIR_BASE
 
 # variables user can configure
 CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE="%Y-%m/%Y-%m-%d/%Y-%m-%d_%H/%Y-%m-%d_%H%M/%s.%N"
