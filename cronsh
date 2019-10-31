@@ -421,6 +421,8 @@ trap 'cronsh_signal interrupt' INT
 
 delay `random_range ${CRONSH_INSTANCE_RANDOM_DELAY[@]}` random delay before starting job
 
+mkdir -p "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/persist"
+
 [ ! -e pre-instance ] || . pre-instance
 
 
@@ -433,7 +435,7 @@ do
 	CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
 	CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
 	
-	# Expose attempt specific variables
+	# Expose attempt-specific variables
 	export CRONSH_ATTEMPT_START_TIMESTAMP
 	export CRONSH_WORKDIR_ABS
 	
@@ -458,6 +460,13 @@ do
 			check_deadline
 		fi
 		
+		export CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started"`
+		#export CRONSH_PREVIOUS_FAILED_STARTED=
+		#export CRONSH_PREVIOUS_STARTED=
+		export CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`
+		#export CRONSH_PREVIOUS_FAILED_ENDED=
+		#export CRONSH_PREVIOUS_ENDED=
+		
 		[ ! -e pre-attempt ] || . pre-attempt
 		
 		(
@@ -466,10 +475,10 @@ do
 			exec 1> >(exec tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
 			exec 2> >(exec tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
 			
-			mkdir -p "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/persist"
 			# Note: CRONSH_ATTEMPT_DIRNAME adds 1 path element, plus "instance/" element is added by get_instance_relative_canonical_dir()
 			ln -sfn $(mk_ascending_path "$CRONSH_INSTANCE_CANONICAL_DIR")../../persist "$CRONSH_WORKDIR/persist"
 			
+			mk_timestamp_file "$CRONSH_WORKDIR/started" "$CRONSH_ATTEMPT_START_TIMESTAMP_NS"
 			mk_symlinks_in_various_datetime_formats "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR" $CRONSH_ATTEMPT_START_TIMESTAMP_NS
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME/stdout.txt" "$CRONSH_ATTEMPTS_BASEDIR/stdout-job.txt"
