@@ -235,7 +235,9 @@ Options:
 log)
 	usage()
 	{
-		echo "Usage: cronshctl log [-f] <job-directory> [...]" >&2
+		echo "Usage: cronshctl log [-f] <job-directory> [...]
+Options:
+ -f   follow logs (see: tail -F)" >&2
 	}
 	
 	logfiles=()
@@ -336,6 +338,16 @@ log)
 	tail "${tail_opts[@]}" "${logfiles[@]}"
 	;;
 
+attach)
+	usage()
+	{
+		echo "Usage: cronshctl attach [-r] <job-instance-directory>
+Options:
+ -r   readonly mode" >&2
+	}
+	
+	keept ba "$1/console"
+	;;
 stop)
 	usage()
 	{
@@ -470,10 +482,8 @@ esac
 
 
 # TODO
-# cronshctl log (tail -f)
 # cronshctl ps --start-time --end-time
 # cronshctl vars <JOBDIR>
 # allow delete an instance's work dir
 # account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
 # cronsh: run detached in background
-# attach to job console

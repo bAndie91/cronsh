@@ -23,6 +23,7 @@ CRONSH_DISABLE_ON_FAIL=no
 CRONSH_MIN_REST_INTERVAL=0
 CRONSH_MIN_REST_INTERVAL_SUCCESS=0
 CRONSH_MIN_REST_INTERVAL_FAILED=0
+CRONSH_KEEPT=maybe
 
 
 # Define subroutines
@@ -158,25 +159,21 @@ unset varnameprefix
 
 
 # Set shell options
-set -e -u
+set -e
+set -u
 enable kill
 shopt -s nullglob
-# Set Job directory
 CRONSH_JOBDIR=$1
-CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
-cd "$CRONSH_JOBDIR"
-# Open file descriptor to lock later on
-exec {CRONSH_LOCK_FD}>>lock
-set +e +u
 
 
 # Load the job's saved configuration
-[ ! -e config ] || . config
-for cfgfile in config.d/*
+[ ! -e "$CRONSH_JOBDIR"/config ] || . "$CRONSH_JOBDIR"/config
+for cfgfile in "$CRONSH_JOBDIR"/config.d/*
 do
 	. "$cfgfile"
 done
-
+unset cfgfile
+set +u
 
 # Override config variables with ones passed in CLI args
 for var in "${!config_override[@]}"
@@ -184,8 +181,29 @@ do
 	value=${config_override[$var]}
 	eval "$var=\$value"
 done
-unset var value
+unset var value config_override
 
+
+# Call ourself in under 'keept'
+if [ -z "$KEEPT_PID" ]
+then
+	if [ "$CRONSH_KEEPT" = must ] && ! type keept >/dev/null
+	then
+		die
+	fi
+	if [ "$CRONSH_KEEPT" = maybe -o "$CRONSH_KEEPT" = must ] && type keept >/dev/null 2>&1
+	then
+		keept_sock=$CRONSH_JOBDIR/.console.$RANDOM
+		exec keept bm "$keept_sock" "$BASH" "$0" "$@"
+	fi
+fi
+
+
+CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
+cd "$CRONSH_JOBDIR"
+# Open file descriptor to lock later on
+exec {CRONSH_LOCK_FD}>>lock
+set +e
 
 
 
@@ -264,7 +282,7 @@ queue-new)
 		pendlocks=`count_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || die
 		if [ $pendlocks -ge $CRONSH_INSTANCE_QUEUE_SIZE ]
 		then
-			die "Queue is exhausted ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
+			die "Queue is full ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
 		fi
 	fi
 	
@@ -331,6 +349,10 @@ ln -sfn "$CRONSH_INSTANCE_CANONICAL_DIR" "$CRONSH_WORKDIR_BASE/most-recent-start
 echo -n $$ >"$CRONSH_INSTANCE_WORKDIR/pid"
 exec {CRONSH_INSTANCE_LOCK_FD}>>"$CRONSH_INSTANCE_WORKDIR/pid"
 flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
+if [ -n "$KEEPT_SOCKARG" ]
+then
+	mv "$KEEPT_SOCKARG" "$CRONSH_INSTANCE_WORKDIR"/console
+fi
 exec {stdout_copy}>&1
 exec {stderr_copy}>&2
 exec 1> >(exec tee "$CRONSH_INSTANCE_WORKDIR/stdout.txt" >&1)
