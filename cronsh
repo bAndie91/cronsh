@@ -463,9 +463,12 @@ do
 		(
 			set -e
 			mkdir -p "$CRONSH_WORKDIR"
-			
 			exec 1> >(exec tee "$CRONSH_WORKDIR/stdout.txt" >&$stdout_copy)
 			exec 2> >(exec tee "$CRONSH_WORKDIR/stderr.txt" >&$stderr_copy)
+			
+			mkdir -p "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/persist"
+			# Note: CRONSH_ATTEMPT_DIRNAME adds 1 path element, plus "instance/" element is added by get_instance_relative_canonical_dir()
+			ln -sfn $(mk_ascending_path "$CRONSH_INSTANCE_CANONICAL_DIR")../../persist "$CRONSH_WORKDIR/persist"
 			
 			mk_symlinks_in_various_datetime_formats "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR" $CRONSH_ATTEMPT_START_TIMESTAMP_NS
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME" "$CRONSH_ATTEMPTS_BASEDIR/latest-attempt"

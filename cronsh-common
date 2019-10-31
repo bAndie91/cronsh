@@ -119,6 +119,17 @@ mk_abs_path()
 	fi
 }
 
+mk_ascending_path()
+{
+	local normalized_path=$1
+	local slashes=${normalized_path//[!\/]/}
+	local i
+	for i in `seq 1 ${#slashes}`
+	do
+		echo -n '../'
+	done
+}
+
 get_instance_relative_canonical_dir()
 {
 	local timestamp=$1
