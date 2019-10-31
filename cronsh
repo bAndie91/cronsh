@@ -24,6 +24,7 @@ CRONSH_MIN_REST_INTERVAL=0
 CRONSH_MIN_REST_INTERVAL_SUCCESS=0
 CRONSH_MIN_REST_INTERVAL_FAILED=0
 CRONSH_KEEPT=maybe
+CRONSH_KEEPT_SOCKET_TMP=''
 
 
 # Define subroutines
@@ -76,7 +77,7 @@ exit_cronsh()
 		[ ! -e on-success ] || ./on-success
 	fi
 	
-	if [ "$CRONSH_KEEPT" != no -a -n "$KEEPT_SOCKARG" ]
+	if [ -n "$CRONSH_KEEPT_SOCKET_TMP" ]
 	then
 		rm "$CRONSH_INSTANCE_WORKDIR_ABS/console"
 	fi
@@ -190,7 +191,7 @@ unset var value config_override
 
 
 # Call ourself in under 'keept'
-if [ -z "$KEEPT_PID" ]
+if [ -z "$CRONSH_KEEPT_SOCKET_TMP" ]
 then
 	if [ "$CRONSH_KEEPT" = must ] && ! type keept >/dev/null
 	then
@@ -198,8 +199,9 @@ then
 	fi
 	if [ "$CRONSH_KEEPT" = maybe -o "$CRONSH_KEEPT" = must ] && type keept >/dev/null 2>&1
 	then
-		keept_sock=$CRONSH_JOBDIR/.console.$RANDOM
-		exec keept bm "$keept_sock" "$BASH" "$0" "$@"
+		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
+		export CRONSH_KEEPT_SOCKET_TMP
+		exec keept bm "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "$@"
 	fi
 fi
 
