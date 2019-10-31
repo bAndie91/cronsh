@@ -76,6 +76,11 @@ exit_cronsh()
 		[ ! -e on-success ] || ./on-success
 	fi
 	
+	if [ "$CRONSH_KEEPT" != no -a -n "$KEEPT_SOCKARG" ]
+	then
+		rm "$CRONSH_INSTANCE_WORKDIR_ABS/console"
+	fi
+	
 	exit ${CRONSH_LAST_STATUS:-255}
 }
 check_timeout()
