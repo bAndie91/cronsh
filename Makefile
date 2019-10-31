@@ -11,7 +11,7 @@ install: all
 	for trg in $(install_bin_targets); do \
 	  install $$trg /usr/bin/$$trg; \
 	done
-	mkdir /usr/lib/cronsh
+	install -d /usr/lib/cronsh
 	for trg in $(install_lib_targets); do \
 	  install $$trg /usr/lib/cronsh/$$trg; \
 	done
