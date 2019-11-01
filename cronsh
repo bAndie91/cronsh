@@ -201,7 +201,7 @@ then
 	then
 		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
 		export CRONSH_KEEPT_SOCKET_TMP
-		exec keept bm "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "$@"
+		exec keept bmS "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "$@"
 	fi
 fi
 
