@@ -2,6 +2,9 @@
 install_bin_targets = cronsh_setpgrp cronsh_loadenv cronsh cronshctl
 install_lib_targets = cronsh-common
 
+BINDIR = /usr/bin
+LIBDIR = /usr/lib/cronsh
+
 all: cronsh_loadenv cronsh_setpgrp
 
 cronsh_loadenv cronsh_setpgrp:
@@ -9,18 +12,28 @@ cronsh_loadenv cronsh_setpgrp:
 
 install: all
 	for trg in $(install_bin_targets); do \
-	  install $$trg /usr/bin/$$trg; \
+	  install $$trg $(BINDIR)/$$trg; \
 	done
-	install -d /usr/lib/cronsh
+	install -d $(LIBDIR)
 	for trg in $(install_lib_targets); do \
-	  install $$trg /usr/lib/cronsh/$$trg; \
+	  install $$trg $(LIBDIR)/$$trg; \
 	done
 
 uninstall:
 	for trg in $(install_bin_targets); do \
-	  rm /usr/bin/$$trg; \
+	  rm $(BINDIR)/$$trg; \
 	done
 	for trg in $(install_lib_targets); do \
-	  rm /usr/lib/cronsh/$$trg; \
+	  rm $(LIBDIR)/$$trg; \
 	done
-	rmdir /usr/lib/cronsh
+	rmdir $(LIBDIR)
+
+check_installation:
+	@for trg in $(install_bin_targets); do \
+	  echo -n $(BINDIR)/$$trg:" "; \
+	  cmp -s $$trg $(BINDIR)/$$trg && echo MATCH || echo MISMATCH; \
+	done
+	@for trg in $(install_lib_targets); do \
+	  echo -n $(LIBDIR)/$$trg:" "; \
+	  cmp -s $$trg $(LIBDIR)/$$trg && echo MATCH || echo MISMATCH; \
+	done
