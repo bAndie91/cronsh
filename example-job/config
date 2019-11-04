@@ -63,21 +63,22 @@ CRONSH_ATTEMPTS_INTERVAL=0
 # zero means no limit
 CRONSH_ATTEMPTS_MAX=1
 
-# CRONSH_INSTANCE_RANDOM_DELAY
-# bash array
+# CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST CRONSH_INSTANCE_RANDOM_DELAY_ATMOST
 # wait random amount of time before attempt to start the job before 'pre-instance' stage
-# you may specify an upper limit of randomness or a range
-# example: CRONSH_INSTANCE_RANDOM_DELAY=5min
-# example: CRONSH_INSTANCE_RANDOM_DELAY=(5sec 1min)
-CRONSH_INSTANCE_RANDOM_DELAY=(0 0)
+# specify lower and upper limit of randomness in CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST and CRONSH_INSTANCE_RANDOM_DELAY_ATMOST respectively
+# having CRONSH_INSTANCE_RANDOM_DELAY_ATMOST less than CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST does nothing effectively
+# example: CRONSH_INSTANCE_RANDOM_DELAY_ATMOST=5min
+# example: CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST=5sec
+# example: CRONSH_INSTANCE_RANDOM_DELAY_ATMOST=1min
+CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST=0
+CRONSH_INSTANCE_RANDOM_DELAY_ATMOST=0
 
-# CRONSH_ATTEMPTS_RANDOM_DELAY
-# bash array
+# CRONSH_ATTEMPTS_RANDOM_DELAY_ATLEAST CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST
 # wait random amount of time between each attempts before 'pre-attempt' stage
-# you may specify an upper limit of randomness or a range
-# example: CRONSH_ATTEMPTS_RANDOM_DELAY=5sec
-# example: CRONSH_ATTEMPTS_RANDOM_DELAY=(1sec 3sec)
-CRONSH_ATTEMPTS_RANDOM_DELAY=(0 0)
+# similar to CRONSH_INSTANCE_RANDOM_DELAY_*, see them
+# example: CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST=3sec
+CRONSH_ATTEMPTS_RANDOM_DELAY_ATLEAST=0
+CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST=0
 
 # CRONSH_JOB_TIMEOUT
 # once the actual job started, terminate after this much time
@@ -88,7 +89,7 @@ CRONSH_JOB_TIMEOUT=0
 # once the actual job started, terminate on this time (see date(1) '-d' option for valid expressions)
 CRONSH_JOB_DEADLINE_DATESTR=''
 
-# CRONSH_NICE, CRONSH_IONICE_CLASS, CRONSH_IONICE_CLASSDATA
+# CRONSH_NICE CRONSH_IONICE_CLASS CRONSH_IONICE_CLASSDATA
 # see nice(1), ionice(1)
 CRONSH_NICE=19
 CRONSH_IONICE_CLASS=idle
