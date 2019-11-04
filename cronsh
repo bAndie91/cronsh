@@ -243,6 +243,8 @@ then
 	die "Job is disabled."
 fi
 
+
+# Check cooldown parameters
 now=`date +%s`
 last_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/latest-instance-end"`
 last_successful_instance_end=`get_timestamp_sec_or_zero "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`

@@ -42,6 +42,11 @@ find_current_attempt_pid()
 	fi
 }
 
+does_look_like_a_jobdir()
+{
+	[ -e "$1/lock" -a -e "$1/job" -a -d "$1/$CRONSH_WORKDIR_BASE/instance" ]
+}
+
 
 shopt -s extglob
 shopt -s nullglob
@@ -346,7 +351,15 @@ Options:
  -r   readonly mode" >&2
 	}
 	
-	keept ba "$1/console"
+	sock=$1/console
+	
+	if [ ! -S "$sock" ] && does_look_like_a_jobdir "$1"
+	then
+		note "Attaching to most recent started job instance..."
+		sock=$1/$CRONSH_WORKDIR_BASE/most-recent-started/console
+	fi
+	
+	keept ba "$sock"
 	;;
 stop)
 	usage()
