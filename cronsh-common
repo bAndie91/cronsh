@@ -243,6 +243,8 @@ human_date_fmt_min="%Y-%m-%d_%H:%M"
 human_date_fmt_ls="%Y-%m-%d %H:%M"
 human_date_fmt_ls_width=16
 
+cronsh_varnameprefix=CRONSH_
+
 CRONSH_WORKDIR_BASE=work
 readonly CRONSH_WORKDIR_BASE
 

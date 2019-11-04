@@ -146,11 +146,10 @@ cronsh_signal()
 # Read config variables passed by CLI arguments
 # TODO: get config from environment? (maybe unwanted when cronsh calls an other cronsh job)
 declare -A config_override
-varnameprefix=CRONSH_
 while expr "$1" : '.\+=' >/dev/null
 do
 	varname=${1%%=*}
-	if [ "${varname:0:${#varnameprefix}}" != "$varnameprefix" -o "${!varname+x}" != 'x' ]
+	if [ "${varname:0:${#cronsh_varnameprefix}}" != "$cronsh_varnameprefix" -o "${!varname+x}" != 'x' ]
 	then
 		echo "cronsh: invalid config variable: $varname" >&2
 		set -e
@@ -160,7 +159,6 @@ do
 	shift
 done
 unset varname
-unset varnameprefix
 
 
 # Set shell options
@@ -200,7 +198,30 @@ then
 	then
 		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
 		export CRONSH_KEEPT_SOCKET_TMP
-		exec keept bmu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "$@"
+		# Generate list of all CRONSH_* variable to pass to re-invoked cronsh
+		all_params=()
+		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
+		do
+			declaration=(`declare -p "$varname"`)
+			case "${declaration[1]}" in
+			*a*)
+				# construct the array assigment r-value
+				value='('
+				eval 'array=("${'$varname'[@]}")'
+				for x in "${array[@]}"
+				do
+					sqx=${x//\'/\'\\\'\'}
+					value="$value '$sqx'"
+				done
+				value="$value)"
+				;;
+			*)	value=${!varname};;
+			# only scalars and arrays are supported (not associative arrays)
+			esac
+			all_params+=("$varname=$value")
+		done
+		# Cronsh invoke itself within keept
+		exec keept bmu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "${all_params[@]}" "$@"
 	fi
 fi
 
