@@ -26,6 +26,7 @@ CRONSH_MIN_COOLDOWN=0
 CRONSH_MIN_COOLDOWN_SUCCESS=0
 CRONSH_MIN_COOLDOWN_FAILED=0
 CRONSH_KEEPT=maybe
+CRONSH_READ_CONFIG=yes
 
 
 # Define subroutines
@@ -44,6 +45,7 @@ do
 		break
 	fi
 done
+unset libdir
 set +e
 
 exit_cronsh()
@@ -147,6 +149,8 @@ cronsh_signal()
 
 # Read config variables passed by CLI arguments
 # TODO: get config from environment? (maybe unwanted when cronsh calls an other cronsh job)
+# NOTE: if some CRONSH_* var has been got from environment, then it may not be reported as invalid
+# NOTE: incompatible with bash 'set -k'
 declare -A config_override
 while expr "$1" : '.\+=' >/dev/null
 do
@@ -157,7 +161,11 @@ do
 		set -e
 		false
 	fi
-	config_override[$varname]=${1#*=}
+	case "$varname" in
+	CRONSH_READ_CONFIG)
+		eval "$varname=\${1#*=}";;
+	*)	config_override[$varname]=${1#*=};;
+	esac
 	shift
 done
 unset varname
@@ -169,25 +177,27 @@ set -u
 enable kill
 shopt -s nullglob
 CRONSH_JOBDIR=$1
+saved_CRONSH_JOBDIR=$CRONSH_JOBDIR
 
 
 # Load the job's saved configuration
-[ ! -e "$CRONSH_JOBDIR"/config ] || . "$CRONSH_JOBDIR"/config
-for cfgfile in "$CRONSH_JOBDIR"/config.d/*
-do
-	. "$cfgfile"
-done
-unset cfgfile
+if [ "$CRONSH_READ_CONFIG" = yes ]
+then
+	[ ! -e "$CRONSH_JOBDIR"/config ] || . "$CRONSH_JOBDIR"/config
+	for cfgfile in "$CRONSH_JOBDIR"/config.d/*
+	do
+		. "$cfgfile"
+	done
+	unset cfgfile
+fi
 set +u
 
 # Override config variables with ones passed in CLI args
-for var in "${!config_override[@]}"
+for varname in "${!config_override[@]}"
 do
-	value=${config_override[$var]}
-	eval "$var=\$value"
+	eval "$varname=\${config_override[$varname]}"
 done
-unset var value config_override
-
+unset varname config_override
 
 # Call ourself in under 'keept'
 if [ -z "$CRONSH_KEEPT_SOCKET_TMP" ]
@@ -198,36 +208,27 @@ then
 	fi
 	if [ "$CRONSH_KEEPT" = maybe -o "$CRONSH_KEEPT" = must ] && type keept >/dev/null 2>&1
 	then
-		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
-		export CRONSH_KEEPT_SOCKET_TMP
 		# Generate list of all CRONSH_* variable to pass to re-invoked cronsh
 		all_params=()
 		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
 		do
-			declaration=(`declare -p "$varname"`)
-			case "${declaration[1]}" in
-			*a*)
-				# construct the array assigment r-value
-				value='('
-				eval 'array=("${'$varname'[@]}")'
-				for x in "${array[@]}"
-				do
-					sqx=${x//\'/\'\\\'\'}
-					value="$value '$sqx'"
-				done
-				value="$value)"
-				;;
-			*)	value=${!varname};;
-			# only scalars and arrays are supported (not associative arrays)
+			case "$varname" in
+			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE)
+				# don't pass it to our reincarnation
+				true;;
+			*)
+				all_params+=("$varname=${!varname}");;
 			esac
-			all_params+=("$varname=$value")
 		done
 		# Cronsh invoke itself within keept
-		exec keept bmu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" "${all_params[@]}" "$@"
+		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
+		export CRONSH_KEEPT_SOCKET_TMP
+		exec keept bmu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" CRONSH_READ_CONFIG=no "${all_params[@]}" "$@"
 	fi
 fi
 
 
+CRONSH_JOBDIR=$saved_CRONSH_JOBDIR
 CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 cd "$CRONSH_JOBDIR"
 # Open file descriptor to lock later on
@@ -304,6 +305,7 @@ allow-concurrent)
 	;;
 deny-new)
 	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	# TODO: info about already running instance
 	;;
 queue-new)
 	if [ $CRONSH_INSTANCE_QUEUE_SIZE != 0 ]

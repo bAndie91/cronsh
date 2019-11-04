@@ -2,5 +2,7 @@
 # available variables:
 # 
 # CRONSH_LAST_STATUS
+#   exit code of the last job attempt (of this job instance)
+#
 # CRONSH_STOP_REASON
 #   possible values: attempt-timeout, attempt-deadline, attempt-limit, job-timeout, job-deadline, terminate, interrupt

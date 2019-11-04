@@ -1,0 +1,5 @@
+
+# available variables:
+#
+# CRONSH_LAST_STATUS
+#   exit code of the previous job attempt (of this job instance)

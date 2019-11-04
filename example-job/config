@@ -104,3 +104,21 @@ CRONSH_IONICE_CLASSDATA=''
 # using keept allows you to bring cronsh job to the foreground on any terminal
 # useful when running jobs in the background
 CRONSH_KEEPT=maybe
+
+# CRONSH_KEEPT_SOCKET_TMP
+# used internally
+# indicating that this cronsh job instance is in keept,
+# so some logic, which already run when the control was outside of keept, don't run again
+# don't use it
+
+# CRONSH_READ_CONFIG
+# used internally
+# options: yes, no
+# default: yes
+# you likely do want to have cronsh read its config files, and also, it's pointless in config file
+# don't use it
+
+# CRONSH_JOBDIR
+# directory where the invoked cronsh job lives with its configs, logs, code, data and control files
+# its value comes from positional argument, not from config. it's also has been already acquired when config file is being processed
+# don't use it

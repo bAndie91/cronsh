@@ -2,4 +2,11 @@
 # available variables:
 #
 # CRONSH_PREVIOUS_SUCCESSFUL_STARTED
+#   start timestamp of last successful job attempt (of any job instance if they can be concurrent)
+#
 # CRONSH_PREVIOUS_SUCCESSFUL_ENDED
+#   end timestamp of last successful job instance
+#
+# CRONSH_LAST_STATUS
+#   exit code of the previous job attempt (of this job instance)
+#   empty if it's the first attempt
