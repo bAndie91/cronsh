@@ -58,7 +58,7 @@ cmd=$1
 shift
 
 case "$cmd" in
-ps)
+ps|history)
 	usage()
 	{
 		echo "Usage: cronshctl ps [<options>] [<job-directory>]
@@ -75,6 +75,11 @@ Options:
 	show_by_exitcode=''
 	show_workdir=''
 	declare -a show_instance_ids
+	
+	if [ "$cmd" = history ]
+	then
+		show_active_only=no
+	fi
 	
 	while [ -n "$1" ]
 	do
@@ -498,7 +503,7 @@ stop)
 	;;
 
 *)
-	echo "cronshctl [ps | stop | log | attach]" >&2
+	echo "cronshctl [ps | stop | log | attach | history]" >&2
 	exit 1
 	;;
 esac
