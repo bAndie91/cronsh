@@ -9,6 +9,7 @@ CRONSH_ATTEMPTS_MAX=1
 CRONSH_ATTEMPTS_TIMEOUT=0
 CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 CRONSH_ATTEMPTS_INTERVAL=0
+CRONSH_PRECHECK_INTERVAL=0
 CRONSH_JOB_TIMEOUT=0
 CRONSH_JOB_DEADLINE_DATESTR=''
 CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST=0
@@ -360,7 +361,7 @@ stop-old)
 	trap - INT TERM
 	;;
 *)
-	die "Bad config: \$CRONSH_NEW_INSTANCE_POLICY=$CRONSH_NEW_INSTANCE_POLICY"
+	die "Bad config: CRONSH_NEW_INSTANCE_POLICY=$CRONSH_NEW_INSTANCE_POLICY"
 	;;
 esac
 
@@ -400,6 +401,7 @@ CRONSH_ATTEMPTS_DEADLINE=0
 CRONSH_LAST_STATUS=''
 CRONSH_ATTEMPTS_TIMEOUT=`to_sec $CRONSH_ATTEMPTS_TIMEOUT`
 CRONSH_ATTEMPTS_INTERVAL=`to_nsec $CRONSH_ATTEMPTS_INTERVAL`
+CRONSH_PRECHECK_INTERVAL=`to_nsec $CRONSH_PRECHECK_INTERVAL`
 CRONSH_ATTEMPT_NUMBER=0
 CRONSH_JOB_DEADLINE=0
 [ -z "$CRONSH_JOB_DEADLINE_DATESTR" ] || CRONSH_JOB_DEADLINE=`date +%s -d "$CRONSH_JOB_DEADLINE_DATESTR"`
@@ -446,19 +448,6 @@ mkdir -p "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/persist"
 
 while true
 do
-	let CRONSH_ATTEMPT_NUMBER++
-	CRONSH_ATTEMPT_START_TIMESTAMP_NS=`date +%s.%N`
-	CRONSH_ATTEMPT_START_TIMESTAMP=${CRONSH_ATTEMPT_START_TIMESTAMP_NS%.*}
-	CRONSH_ATTEMPT_DIRNAME=attempt-$CRONSH_ATTEMPT_NUMBER
-	CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
-	CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
-	
-	# Expose attempt-specific variables
-	export CRONSH_ATTEMPT_START_TIMESTAMP
-	export CRONSH_WORKDIR_ABS
-	
-	echo -n $CRONSH_ATTEMPT_NUMBER >"$CRONSH_ATTEMPTS_BASEDIR/latest-attempt-num"
-	
 	if [ -d "$CRONSH_JOBDIR_ABS"/condition ]
 	then
 		run-parts --exit-on-error "$CRONSH_JOBDIR_ABS"/condition
@@ -467,8 +456,15 @@ do
 		preconditions_err=''
 	fi
 	
+	check_signal
+	check_timeout
+	check_deadline
+	
 	if [ "$preconditions_err" = 0 -o "$preconditions_err" = '' ]
 	then
+		let CRONSH_ATTEMPT_NUMBER++
+		echo -n $CRONSH_ATTEMPT_NUMBER >"$CRONSH_ATTEMPTS_BASEDIR/latest-attempt-num"
+		
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 		then
 			delay `random_range $CRONSH_ATTEMPTS_RANDOM_DELAY_ATLEAST $CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST` random delay before an attempt
@@ -477,12 +473,23 @@ do
 			check_deadline
 		fi
 		
-		export CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started"`
-		#export CRONSH_PREVIOUS_FAILED_STARTED=
-		#export CRONSH_PREVIOUS_STARTED=
-		export CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`
-		#export CRONSH_PREVIOUS_FAILED_ENDED=
-		#export CRONSH_PREVIOUS_ENDED=
+		CRONSH_ATTEMPT_START_TIMESTAMP_NS=`date +%s.%N`
+		CRONSH_ATTEMPT_START_TIMESTAMP=${CRONSH_ATTEMPT_START_TIMESTAMP_NS%.*}
+		CRONSH_ATTEMPT_DIRNAME=attempt-$CRONSH_ATTEMPT_NUMBER
+		CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
+		CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
+		CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started"`
+		CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`
+		
+		# Expose attempt-specific variables
+		export CRONSH_ATTEMPT_START_TIMESTAMP
+		export CRONSH_WORKDIR_ABS
+		export CRONSH_PREVIOUS_SUCCESSFUL_STARTED
+		#export CRONSH_PREVIOUS_FAILED_STARTED
+		#export CRONSH_PREVIOUS_STARTED
+		export CRONSH_PREVIOUS_SUCCESSFUL_ENDED
+		#export CRONSH_PREVIOUS_FAILED_ENDED
+		#export CRONSH_PREVIOUS_ENDED
 		
 		[ ! -e pre-attempt ] || . pre-attempt
 		
@@ -585,19 +592,13 @@ do
 			done
 		fi
 		CRONSH_ATTEMPT_PGID=''
+		
+		check_signal
+		
+		[ ! -e post-attempt ] || . post-attempt
 	else
 		note "preconditions are not met"
 	fi
-	
-	check_signal
-	check_timeout
-	check_deadline
-	
-	[ ! -e post-attempt ] || . post-attempt
-	
-	check_signal
-	check_timeout
-	check_deadline
 	
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
@@ -610,7 +611,12 @@ do
 			exit_cronsh
 		fi
 		
-		delay $CRONSH_ATTEMPTS_INTERVAL between attempts
+		if [ "$preconditions_err" != '' -a "$preconditions_err" != 0 ]
+		then
+			delay $CRONSH_PRECHECK_INTERVAL between precondition checks
+		else
+			delay $CRONSH_ATTEMPTS_INTERVAL between attempts
+		fi
 		
 		check_signal
 		check_timeout

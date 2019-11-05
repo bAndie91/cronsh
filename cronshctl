@@ -22,12 +22,15 @@ set +e
 
 find_last_attempt_number()
 {
-	cat "$1/latest-attempt-num"
+	cat "$1/latest-attempt-num" 2>/dev/null
 }
 find_last_attempt_pidfile()
 {
 	local lastattempt=`find_last_attempt_number "$1"`
-	echo "$1/attempt-$lastattempt/pid"
+	if [ -n "$lastattempt" ]
+	then
+		echo "$1/attempt-$lastattempt/pid"
+	fi
 }
 find_current_attempt_pid()
 {
@@ -180,24 +183,31 @@ Options:
 		ended=`date +"$human_date_fmt_ls" -d "@$(cat "$instancedir/end" 2>/dev/null)" 2>/dev/null`
 		attempts=`find_last_attempt_number "$instancedir"`
 		
-		if [ -e "$instancedir/attempt-$attempts/status" ]
+		if [ -z "$attempts" ]
 		then
-			# last job attempt is ended
-			lastattempt=$attempts
+			laststatus=''
 			attemptpid=''
+			attempts=0
 		else
-			# latest job attempt is in progress
-			lastattempt=$[attempts - 1]
-			pidfile=$instancedir/attempt-$attempts/pid
-			if is_locked "$pidfile"
+			if [ -e "$instancedir/attempt-$attempts/status" ]
 			then
-				attemptpid=`cat "$pidfile"`
-			else
+				# last job attempt is ended
+				lastattempt=$attempts
 				attemptpid=''
+			else
+				# latest job attempt is in progress
+				lastattempt=$[attempts - 1]
+				pidfile=$instancedir/attempt-$attempts/pid
+				if is_locked "$pidfile"
+				then
+					attemptpid=`cat "$pidfile"`
+				else
+					attemptpid=''
+				fi
 			fi
+			laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
+			# TODO: get final status code from status-history file for TERM instances
 		fi
-		laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
-		# TODO: get final status code from status-history file for TERM instances
 		
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}
 	done
@@ -488,7 +498,7 @@ stop)
 	;;
 
 *)
-	echo "cronshctl [ps | stop | log]" >&2
+	echo "cronshctl [ps | stop | log | attach]" >&2
 	exit 1
 	;;
 esac
@@ -497,6 +507,7 @@ esac
 # TODO
 # cronshctl ps --start-time --end-time
 # cronshctl vars <JOBDIR>
-# allow delete an instance's work dir
+# allow delete an instance's work dir (which did nothing valuable)
 # account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
 # cronsh: run detached in background
+# expose more variables for hook scripts (CRONSH_PRECHECK_INTERVAL, CRONSH_ATTEMPTS_INTERVAL, CRONSH_ATTEMPTS_DEADLINE_DATESTR ...) and recalculate them
