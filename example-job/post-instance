@@ -1,4 +1,7 @@
 
+# post-instance runs after each job instance
+# even after job deadline or timeout is reached
+
 # available variables:
 # 
 # CRONSH_LAST_STATUS

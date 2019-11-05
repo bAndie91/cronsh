@@ -467,13 +467,12 @@ do
 		preconditions_err=''
 	fi
 	
-	check_signal
-	
 	if [ "$preconditions_err" = 0 -o "$preconditions_err" = '' ]
 	then
 		if [ $CRONSH_ATTEMPT_NUMBER -gt 1 ]
 		then
 			delay `random_range $CRONSH_ATTEMPTS_RANDOM_DELAY_ATLEAST $CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST` random delay before an attempt
+			check_signal
 			check_timeout
 			check_deadline
 		fi
@@ -486,6 +485,10 @@ do
 		#export CRONSH_PREVIOUS_ENDED=
 		
 		[ ! -e pre-attempt ] || . pre-attempt
+		
+		check_signal
+		check_timeout
+		check_deadline
 		
 		(
 			set -e
@@ -587,6 +590,14 @@ do
 	fi
 	
 	check_signal
+	check_timeout
+	check_deadline
+	
+	[ ! -e post-attempt ] || . post-attempt
+	
+	check_signal
+	check_timeout
+	check_deadline
 	
 	if [ "$CRONSH_LAST_STATUS" = 0 ]
 	then
@@ -598,10 +609,6 @@ do
 			note "reached max attempts ($CRONSH_ATTEMPTS_MAX)"
 			exit_cronsh
 		fi
-		check_timeout
-		check_deadline
-		
-		[ ! -e post-attempt ] || . post-attempt
 		
 		delay $CRONSH_ATTEMPTS_INTERVAL between attempts
 		

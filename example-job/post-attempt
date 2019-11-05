@@ -1,4 +1,8 @@
 
+# post-attempt runs after each job attempt (successful and unsuccessful)
+# in the scope of cronsh controller process
+# does not run if job already exceeded deadline
+#
 # available variables:
 #
 # CRONSH_LAST_STATUS

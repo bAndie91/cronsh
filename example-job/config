@@ -1,7 +1,7 @@
 # This file is basically a script sourced in by bash.
 # Technically you can put any complex logic here, but 
 # please keep only simple "variable=value" statements here.
-# Put your custom initialization login in 'pre-instance' file.
+# Put your custom initialization logic in 'pre-instance' file.
 
 # CRONSH_NEW_INSTANCE_POLICY
 # options: allow-concurrent, deny-new, queue-new, stop-old
