@@ -224,6 +224,7 @@ then
 		# Cronsh invoke itself within keept
 		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
 		export CRONSH_KEEPT_SOCKET_TMP
+		export KEEPT_SUPPRESS_NORMAL_EXIT_MESSAGE=1
 		exec keept bmu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" CRONSH_READ_CONFIG=no "${all_params[@]}" "$@"
 	fi
 fi
