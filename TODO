@@ -1,3 +1,10 @@
+allow to run ad-hoc scripts with
+ - parameters
+ - default cronsh config
+ - auto created workspace in eg. ~/.local/share/cronsh/...
+
+allow ./job arguments
+
 cronshctl ps --start-time --end-time
 
 cronshctl vars <JOBDIR>
