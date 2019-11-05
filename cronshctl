@@ -502,12 +502,3 @@ stop)
 	exit 1
 	;;
 esac
-
-
-# TODO
-# cronshctl ps --start-time --end-time
-# cronshctl vars <JOBDIR>
-# allow delete an instance's work dir (which did nothing valuable)
-# account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
-# cronsh: run detached in background
-# expose more variables for hook scripts (CRONSH_PRECHECK_INTERVAL, CRONSH_ATTEMPTS_INTERVAL, CRONSH_ATTEMPTS_DEADLINE_DATESTR ...) and recalculate them
