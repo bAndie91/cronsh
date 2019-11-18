@@ -55,8 +55,8 @@ CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
 
 # CRONSH_PRECHECK_INTERVAL
 # wait this much time between precondition checks
-# example: CRONSH_PRECHECK_INTERVAL=5sec
-CRONSH_PRECHECK_INTERVAL=0
+# example: CRONSH_PRECHECK_INTERVAL=3sec
+CRONSH_PRECHECK_INTERVAL=5sec
 
 # CRONSH_ATTEMPTS_INTERVAL
 # wait this much time between attempts
