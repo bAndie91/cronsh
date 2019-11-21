@@ -39,12 +39,13 @@ int main(int argc, char** argv)
 		{
 			if(errno != ENOENT)  /* ignore if file does not exist */
 			{
-				perror("fopen");
+				warn("open: %s", argv[1]);
 				goto fail;
 			}
 		}
 		
 		execvp(argv[2], &argv[2]);
+		warn("exec: %s", argv[2]);
 		goto fail;
 	}
 	else

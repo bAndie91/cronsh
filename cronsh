@@ -28,6 +28,7 @@ CRONSH_MIN_COOLDOWN_SUCCESS=0
 CRONSH_MIN_COOLDOWN_FAILED=0
 CRONSH_KEEPT=maybe
 CRONSH_READ_CONFIG=yes
+CRONSH_SHELL_MODE=no
 
 
 # Define subroutines
@@ -146,16 +147,12 @@ cronsh_signal()
 	fi
 }
 
-
-
-# Read config variables passed by CLI arguments
-# TODO: get config from environment? (maybe unwanted when cronsh calls an other cronsh job)
-# NOTE: if some CRONSH_* var has been got from environment, then it may not be reported as invalid
-# NOTE: incompatible with bash 'set -k'
-declare -A config_override
-while expr "$1" : '.\+=' >/dev/null
-do
-	varname=${1%%=*}
+set_cronsh_option()
+{
+	declare -g -A config_override
+	local varname=$1
+	local value=$2
+	
 	if [ "${varname:0:${#cronsh_varnameprefix}}" != "$cronsh_varnameprefix" -o "${!varname+x}" != 'x' ]
 	then
 		echo "cronsh: invalid config variable: $varname" >&2
@@ -163,33 +160,95 @@ do
 		false
 	fi
 	case "$varname" in
+	CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_SHELL_MODE)
+		true;;
 	CRONSH_READ_CONFIG)
-		eval "$varname=\${1#*=}";;
-	*)	config_override[$varname]=${1#*=};;
+		eval "$varname=\$value";;
+	*)	config_override[$varname]=$value;;
 	esac
-	shift
-done
-unset varname
+}
 
+
+
+if [ "$1" = -c ]
+then
+	CRONSH_SHELL_MODE=yes
+	CRONSH_EXECUTION_STRING=$2
+	# Parse the left portion of shell command line string to find cronsh variable assignments
+	# NOTE: this is not a robust shell lexer, just a weak imitation, only a limited syntax is 
+	# supported: inner quotes are not allowed, no dollar-expansion, only 3 kind of tokens are supported:
+	#  - CRONSH_VAR=unquoted_string
+	#  - CRONSH_VAR="quoted string"
+	#  - CRONSH_VAR='quoted string'
+	while [[ $CRONSH_EXECUTION_STRING =~ ^([ ]*)($cronsh_varnameprefix[A-Z0-9_]+)=([^\"\' ]+|\"([^\"]*)\"|\'([^\']*)\')([ ]) ]]
+	do
+		CRONSH_EXECUTION_STRING=${CRONSH_EXECUTION_STRING:${#BASH_REMATCH[0]}}
+		varname=${BASH_REMATCH[2]}
+		case "${BASH_REMATCH[3]:0:1}" in
+		\")	value=${BASH_REMATCH[4]};;
+		\')	value=${BASH_REMATCH[5]};;
+		*)	value=${BASH_REMATCH[3]};;
+		esac
+		set_cronsh_option "$varname" "$value"
+		unset varname value
+	done
+else
+	# Read config variables passed by CLI arguments
+	# TODO: get config from environment? (maybe unwanted when cronsh calls an other cronsh job)
+	# NOTE: if some CRONSH_* var has been got from environment, then it may not be reported as invalid
+	# NOTE: incompatible with bash 'set -k'
+	while true
+	do
+		case "$1" in
+		"$cronsh_varnameprefix"?*=*)
+			set_cronsh_option "${1%%=*}" "${1#*=}"
+			;;
+		*)
+			break
+			;;
+		esac
+		shift
+	done
+fi
 
 # Set shell options
 set -e
 set -u
 enable kill
 shopt -s nullglob
-CRONSH_JOBDIR=$1
-saved_CRONSH_JOBDIR=$CRONSH_JOBDIR
+if [ $CRONSH_SHELL_MODE = no ]
+then
+	# Run job from cronsh directory
+	CRONSH_JOBDIR=$1
+else
+	# Run ad-hoc shell command
+	# Store job data in local directory reflecting the command line
+	CRONSH_JOBDIR=~/.local/share/cronsh/ad-hoc/${CRONSH_EXECUTION_STRING//\//⁄}
+	
+	# Create Jobdir for ad-hoc command
+	if [ ! -d "$CRONSH_JOBDIR" ]
+	then
+		note "Creating Job Directory for ad-hoc command: $CRONSH_JOBDIR"
+		mkdir -p "$CRONSH_JOBDIR"
+	fi
+fi
 
 
 # Load the job's saved configuration
 if [ "$CRONSH_READ_CONFIG" = yes ]
 then
+	saved_CRONSH_JOBDIR=$CRONSH_JOBDIR
+	saved_CRONSH_EXECUTION_STRING=$CRONSH_EXECUTION_STRING
+	
 	[ ! -e "$CRONSH_JOBDIR"/config ] || . "$CRONSH_JOBDIR"/config
 	for cfgfile in "$CRONSH_JOBDIR"/config.d/*
 	do
 		. "$cfgfile"
 	done
 	unset cfgfile
+	
+	CRONSH_JOBDIR=$saved_CRONSH_JOBDIR
+	CRONSH_EXECUTION_STRING=$saved_CRONSH_EXECUTION_STRING
 fi
 set +u
 
@@ -214,7 +273,7 @@ then
 		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
 		do
 			case "$varname" in
-			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE)
+			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_EXECUTION_STRING)
 				# don't pass it to our reincarnation
 				true;;
 			*)
@@ -225,12 +284,17 @@ then
 		CRONSH_KEEPT_SOCKET_TMP=$CRONSH_JOBDIR/.console.$RANDOM
 		export CRONSH_KEEPT_SOCKET_TMP
 		export KEEPT_SUPPRESS_NORMAL_EXIT_MESSAGE=1
-		exec keept bmtu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" CRONSH_READ_CONFIG=no "${all_params[@]}" "$@"
+		if [ $CRONSH_SHELL_MODE = yes ]
+		then
+			all_params+=(-e "$CRONSH_EXECUTION_STRING")
+		else
+			all_params+=("$@")
+		fi
+		exec keept bmtu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" CRONSH_READ_CONFIG=no "${all_params[@]}"
 	fi
 fi
 
 
-CRONSH_JOBDIR=$saved_CRONSH_JOBDIR
 CRONSH_JOBDIR_ABS=`mk_abs_path "$CRONSH_JOBDIR"`
 cd "$CRONSH_JOBDIR"
 # Open file descriptor to lock later on
@@ -479,8 +543,8 @@ do
 		CRONSH_ATTEMPT_DIRNAME=attempt-$CRONSH_ATTEMPT_NUMBER
 		CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
 		CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
-		CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started"`
-		CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end"`
+		CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`[ -e "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started" ] && cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started" || echo 0`
+		CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`[ -e "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" ] && cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" || echo 0`
 		
 		# Expose attempt-specific variables
 		export CRONSH_ATTEMPT_START_TIMESTAMP
@@ -513,6 +577,16 @@ do
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME/stdout.txt" "$CRONSH_ATTEMPTS_BASEDIR/stdout-job.txt"
 			ln -sfn "$CRONSH_ATTEMPT_DIRNAME/stderr.txt" "$CRONSH_ATTEMPTS_BASEDIR/stderr-job.txt"
 			
+			if [ $CRONSH_SHELL_MODE = yes ]
+			then
+				echo "#!$BASH"$'\n'"$CRONSH_EXECUTION_STRING" >"$CRONSH_WORKDIR_ABS/job"
+				chmod +x "$CRONSH_WORKDIR_ABS/job"
+				CRONSH_JOB_COMMAND=$CRONSH_WORKDIR_ABS/job
+			else
+				CRONSH_JOB_COMMAND=$CRONSH_JOBDIR_ABS/job
+			fi
+			export CRONSH_JOB_COMMAND
+			
 			cd "$CRONSH_WORKDIR"
 			
 			exec \
@@ -521,11 +595,12 @@ do
 			cronsh_setpgrp \
 			bash -c '
 				set -e;
+				set -u;
 				pidfile=$CRONSH_WORKDIR_ABS/pid;
 				exec {CRONSH_ATTEMPT_LOCK_FD}>"$pidfile";
 				echo -n $$ >&$CRONSH_ATTEMPT_LOCK_FD;
 				flock --exclusive --nonblock $CRONSH_ATTEMPT_LOCK_FD;
-				exec cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOBDIR_ABS/job";
+				exec cronsh_loadenv "$CRONSH_JOBDIR_ABS/env" "$CRONSH_JOB_COMMAND";
 			'
 		) &
 		CRONSH_ATTEMPT_PID=$!
