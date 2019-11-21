@@ -29,6 +29,7 @@ CRONSH_MIN_COOLDOWN_FAILED=0
 CRONSH_KEEPT=maybe
 CRONSH_READ_CONFIG=yes
 CRONSH_SHELL_MODE=no
+CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
 
 
 # Define subroutines
@@ -279,7 +280,7 @@ then
 		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
 		do
 			case "$varname" in
-			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_EXECUTION_STRING)
+			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_EXECUTION_STRING|CRONSH_LOG_LAST_MESSAGE_TIMESTAMP)
 				# don't pass it to our reincarnation
 				true;;
 			*)

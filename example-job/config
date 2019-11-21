@@ -110,6 +110,17 @@ CRONSH_IONICE_CLASSDATA=''
 # useful when running jobs in the background
 CRONSH_KEEPT=maybe
 
+# CRONSH_LOG_TEMPLATE
+# the format of cronsh log messages
+# template variables:
+#   DATE - strftime %F
+#   TIME - strftime %T
+#   TIMESTAMP - strftime %s
+#   ELAPSED - seconds since last log message
+#   JOBDIR - current $CRONSH_JOBDIR (don't let template variable string to occur in CRONSH_JOBDIR)
+#   MESSAGE - log message itself
+CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
+
 # CRONSH_KEEPT_SOCKET_TMP
 # used internally
 # indicating that this cronsh job instance is in keept,
@@ -127,3 +138,13 @@ CRONSH_KEEPT=maybe
 # directory where the invoked cronsh job lives with its configs, logs, code, data and control files
 # its value comes from positional argument, not from config. it's also has been already acquired when config file is being processed
 # don't use it
+
+# CRONSH_LOG_LAST_MESSAGE_TIMESTAMP
+# used internally
+
+# CRONSH_SHELL_MODE
+# used internally
+
+# CRONSH_EXECUTION_STRING
+# used internally
+# similar to BASH_EXECUTION_STRING

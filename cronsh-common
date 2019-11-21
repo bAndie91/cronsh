@@ -7,7 +7,24 @@ die()
 }
 note()
 {
-	[ -z "$*" ] || echo "cronsh: ${CRONSH_JOBDIR:+<$CRONSH_JOBDIR> }$*" >&2
+	if [ -n "$*" ]
+	then
+		local logstr=$CRONSH_LOG_TEMPLATE
+		local datetime=(`date +"%s %F %T"`)
+		local elapsed
+		if [ "${CRONSH_LOG_LAST_MESSAGE_TIMESTAMP+x}" ]
+		then elapsed=$[${datetime[0]} - $CRONSH_LOG_LAST_MESSAGE_TIMESTAMP]
+		else elapsed=0
+		fi
+		CRONSH_LOG_LAST_MESSAGE_TIMESTAMP=${datetime[0]}
+		logstr=${logstr//\{TIMESTAMP\}/${datetime[0]}}
+		logstr=${logstr//\{DATE\}/${datetime[1]}}
+		logstr=${logstr//\{TIME\}/${datetime[2]}}
+		logstr=${logstr//\{ELAPSED\}/$elapsed}
+		logstr=${logstr//\{JOBDIR\}/$CRONSH_JOBDIR}
+		logstr=${logstr//\{MESSAGE\}/$*}
+		echo "$logstr" >&2
+	fi
 }
 to_sec()
 {
