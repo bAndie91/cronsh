@@ -216,11 +216,14 @@ set -e
 set -u
 enable kill
 shopt -s nullglob
-if [ $CRONSH_SHELL_MODE = no ]
+if [ "$1" = -e ]
 then
-	# Run job from cronsh directory
-	CRONSH_JOBDIR=$1
-else
+	# Execution string given not like it'd given to a shell, but by '-e' option
+	CRONSH_SHELL_MODE=yes
+	CRONSH_EXECUTION_STRING=$2
+fi
+if [ $CRONSH_SHELL_MODE = yes ]
+then
 	# Run ad-hoc shell command
 	# Store job data in local directory reflecting the command line
 	CRONSH_JOBDIR=~/.local/share/cronsh/ad-hoc/${CRONSH_EXECUTION_STRING//\//⁄}
@@ -231,6 +234,9 @@ else
 		note "Creating Job Directory for ad-hoc command: $CRONSH_JOBDIR"
 		mkdir -p "$CRONSH_JOBDIR"
 	fi
+else
+	# Run job from cronsh directory
+	CRONSH_JOBDIR=$1
 fi
 
 

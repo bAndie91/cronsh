@@ -3,12 +3,7 @@ CRONSH_ANY_DELAY=no
 expose more variables for hook scripts (CRONSH_PRECHECK_INTERVAL, CRONSH_ATTEMPTS_INTERVAL, CRONSH_ATTEMPTS_DEADLINE_DATESTR ...)
 and recalculate them (cronsh_apply_vars())
 
-allow to run ad-hoc scripts with
- - parameters
- - default cronsh config
- - auto created workspace in eg. ~/.local/share/cronsh/...
-
-allow ./job arguments
+allow job parameters
 
 cronshctl ps --start-time --end-time
 
@@ -18,7 +13,7 @@ allow delete an instance's work dir (which did nothing valuable)
 
 keep time (timeout and deadline) in precondition check phase as well
 
-cronsh: run detached in background
+cronsh: run detached in background (even w/o keept)
 
 account for changing CRONSH_INSTANCE_CANONICAL_DIR_TEMPLATE
 
