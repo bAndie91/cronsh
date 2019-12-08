@@ -121,6 +121,12 @@ CRONSH_KEEPT=maybe
 #   MESSAGE - log message itself
 CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
 
+# CRONSH_SHELL
+# in ad-hoc and shell mode
+# specify the interpreter you wish run the command line with
+# default is $BASH
+CRONSH_SHELL=/bin/sh
+
 # CRONSH_KEEPT_SOCKET_TMP
 # used internally
 # indicating that this cronsh job instance is in keept,

@@ -31,6 +31,7 @@ CRONSH_READ_CONFIG=yes
 CRONSH_SHELL_MODE=no
 CRONSH_EXECUTION_STRING=''
 CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
+CRONSH_SHELL=$BASH
 
 
 # Define subroutines
@@ -570,6 +571,8 @@ do
 		check_timeout
 		check_deadline
 		
+		note "Starting job attempt $CRONSH_ATTEMPT_NUMBER"
+		
 		(
 			set -e
 			mkdir -p "$CRONSH_WORKDIR"
@@ -587,7 +590,7 @@ do
 			
 			if [ $CRONSH_SHELL_MODE = yes ]
 			then
-				echo "#!$BASH"$'\n'"$CRONSH_EXECUTION_STRING" >"$CRONSH_WORKDIR_ABS/job"
+				echo "#!$CRONSH_SHELL"$'\n'"$CRONSH_EXECUTION_STRING" >"$CRONSH_WORKDIR_ABS/job"
 				chmod +x "$CRONSH_WORKDIR_ABS/job"
 				CRONSH_JOB_COMMAND=$CRONSH_WORKDIR_ABS/job
 			else
