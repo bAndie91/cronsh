@@ -32,6 +32,7 @@ CRONSH_SHELL_MODE=no
 CRONSH_EXECUTION_STRING=''
 CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
 CRONSH_SHELL=$BASH
+CRONSH_JOBDIR=''
 
 
 # Define subroutines
@@ -163,9 +164,11 @@ set_cronsh_option()
 		false
 	fi
 	case "$varname" in
-	CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_SHELL_MODE)
+	CRONSH_WORKDIR_BASE|CRONSH_SHELL_MODE)
 		true;;
-	CRONSH_READ_CONFIG)
+	CRONSH_READ_CONFIG|CRONSH_JOBDIR)
+		# Set these options immediately, because they will be needed 
+		# before config_override array is evaluated.
 		eval "$varname=\$value";;
 	*)	config_override[$varname]=$value;;
 	esac
@@ -219,17 +222,20 @@ set -e
 set -u
 enable kill
 shopt -s nullglob
-if [ "$1" = -e ]
+if [ "${1:-}" = -e ]
 then
-	# Execution string given not like it'd given to a shell, but by '-e' option
+	# Execution string given by '-e' option (not by '-c' as in shell mode)
 	CRONSH_SHELL_MODE=yes
 	CRONSH_EXECUTION_STRING=$2
 fi
 if [ $CRONSH_SHELL_MODE = yes ]
 then
 	# Run ad-hoc shell command
-	# Store job data in local directory reflecting the command line
-	CRONSH_JOBDIR=~/.local/share/cronsh/ad-hoc/${CRONSH_EXECUTION_STRING//\//⁄}
+	if [ -z "$CRONSH_JOBDIR" ]
+	then
+		# Store job data in local directory reflecting the command line
+		CRONSH_JOBDIR=~/.local/share/cronsh/ad-hoc/${CRONSH_EXECUTION_STRING//\//⁄}
+	fi
 	
 	# Create Jobdir for ad-hoc command
 	if [ ! -d "$CRONSH_JOBDIR" ]
@@ -238,8 +244,11 @@ then
 		mkdir -p "$CRONSH_JOBDIR"
 	fi
 else
-	# Run job from cronsh directory
-	CRONSH_JOBDIR=$1
+	# Run job from preconfigured cronsh directory
+	if [ ! -d "$CRONSH_JOBDIR" ]
+	then
+		die "CRONSH_JOBDIR is not given or not a directory: $CRONSH_JOBDIR"
+	fi
 fi
 
 
@@ -282,7 +291,7 @@ then
 		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
 		do
 			case "$varname" in
-			CRONSH_JOBDIR|CRONSH_WORKDIR_BASE|CRONSH_EXECUTION_STRING|CRONSH_LOG_LAST_MESSAGE_TIMESTAMP)
+			CRONSH_WORKDIR_BASE|CRONSH_EXECUTION_STRING|CRONSH_LOG_LAST_MESSAGE_TIMESTAMP)
 				# don't pass it to our reincarnation
 				true;;
 			*)
