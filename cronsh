@@ -612,7 +612,7 @@ do
 			exec \
 			nice -n "$CRONSH_NICE" \
 			ionice -c "$CRONSH_IONICE_CLASS" ${CRONSH_IONICE_CLASSDATA:+-n "$CRONSH_IONICE_CLASSDATA"} \
-			cronsh_setpgrp \
+			setpgrp \
 			bash -c '
 				set -e;
 				set -u;

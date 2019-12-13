@@ -1,13 +1,13 @@
 
-install_bin_targets = cronsh_setpgrp cronsh_loadenv cronsh cronshctl
+install_bin_targets = setpgrp cronsh_loadenv cronsh cronshctl
 install_lib_targets = cronsh-common
 
 BINDIR = /usr/bin
 LIBDIR = /usr/lib/cronsh
 
-all: cronsh_loadenv cronsh_setpgrp
+all: cronsh_loadenv setpgrp
 
-cronsh_loadenv cronsh_setpgrp:
+cronsh_loadenv setpgrp:
 	gcc $(CCFLAGS) -o $@ $@.c
 
 install: all
