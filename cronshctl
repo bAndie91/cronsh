@@ -422,7 +422,7 @@ stop)
 			# If there is a file called "lock" in the directory, we count it as a Job Root dir
 			# and add all instance directories to the list, as it'll be filtered later;
 			jobdir=$1
-			echo "$jobdir: searching instance dirs..." >&2
+			echo "cronshctl: [$jobdir] searching instance dirs..." >&2
 			for instance_id in `gather_non_terminated_instance_ids "$jobdir"`
 			do
 				instance_workdirs+=(`get_fq_instance_dir "$jobdir" "$instance_id"`)

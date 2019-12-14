@@ -466,9 +466,10 @@ ln -sfn "$CRONSH_INSTANCE_CANONICAL_DIR" "$CRONSH_WORKDIR_BASE/most-recent-start
 echo -n $$ >"$CRONSH_INSTANCE_WORKDIR/pid"
 exec {CRONSH_INSTANCE_LOCK_FD}>>"$CRONSH_INSTANCE_WORKDIR/pid"
 flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
-if [ -n "$KEEPT_SOCKARG" ]
+if [ -n "$CRONSH_KEEPT_SOCKET_TMP" ]
 then
-	mv "$KEEPT_SOCKARG" "$CRONSH_INSTANCE_WORKDIR"/console
+	mv "$CRONSH_KEEPT_SOCKET_TMP" "$CRONSH_INSTANCE_WORKDIR"/console
+	unset CRONSH_KEEPT_SOCKET_TMP
 fi
 exec {stdout_copy}>&1
 exec {stderr_copy}>&2
