@@ -126,11 +126,18 @@ random_range()
 }
 delay()
 {
-	local t=$1
+	local duration=$1
 	shift
-	[ "$t" != 0 ] || return
-	note "delay $t: $*"
-	sleep "$t" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&-
+	[ "$duration" != 0 ] || return
+	note "delay $duration: $*"
+	sleep "$duration" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&- &
+	local sleep_pid=$!
+	wait $sleep_pid
+	# Trust that sleep was running for the requested period.
+	if [ $CRONSH_CAUGHT_SIGNAL = yes ]
+	then
+		kill $sleep_pid
+	fi
 }
 
 cronsh_signal()
