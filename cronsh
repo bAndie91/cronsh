@@ -174,6 +174,20 @@ set_cronsh_option()
 	esac
 }
 
+clean_temp_files()
+{
+	if [ -n "${CRONSH_KEEPT_SOCKET_TMP:-}" ]
+	then
+		rm "$CRONSH_KEEPT_SOCKET_TMP"
+	fi
+}
+
+clean_die()
+{
+	clean_temp_files
+	die "$@"
+}
+
 
 
 if [ "$1" = -c ]
@@ -324,7 +338,7 @@ set +e
 
 if [ $CRONSH_ENABLE != yes ]
 then
-	die "Job is disabled."
+	clean_die "Job is disabled."
 fi
 
 
@@ -340,11 +354,11 @@ can_run_soonest_ts=0
 can_run_soonest_atall=$[last_instance_end + CRONSH_MIN_COOLDOWN]
 can_run_soonest_bysuccess=$[last_successful_instance_end + CRONSH_MIN_COOLDOWN_SUCCESS]
 can_run_soonest_byfailed=$[last_unsuccessful_instance_end + CRONSH_MIN_COOLDOWN_FAILED]
+msg_outcome_type=''
 if [ $now -lt $can_run_soonest_atall ]
 then
 	can_run_soonest_ts=$can_run_soonest_atall
 	last_run_ts=$last_instance_end
-	k=''
 fi
 if [ $now -lt $can_run_soonest_bysuccess ]
 then
@@ -352,7 +366,7 @@ then
 	then
 		can_run_soonest_ts=$can_run_soonest_bysuccess
 		last_run_ts=$last_successful_instance_end
-		k="successful"
+		msg_outcome_type="successful"
 	fi
 fi
 if [ $now -lt $can_run_soonest_byfailed ]
@@ -361,15 +375,16 @@ then
 	then
 		can_run_soonest_ts=$can_run_soonest_byfailed
 		last_run_ts=$last_unsuccessful_instance_end
-		k="unsuccessful"
+		msg_outcome_type="unsuccessful"
 	fi
 fi
 if [ $can_run_soonest_ts != 0 ]
 then
 	last_dt=`date -d@$last_run_ts`
 	next_dt=`date -d@$can_run_soonest_ts`
-	die "Last ${k:+$k }job was run $last_dt, next can run not earlier than $next_dt."
+	die "Last ${msg_outcome_type:+$msg_outcome_type }job was run $last_dt, next can run not earlier than $next_dt."
 fi
+unset msg_outcome_type
 
 
 # Acquire Lock
@@ -381,44 +396,44 @@ case "$CRONSH_NEW_INSTANCE_POLICY" in
 allow-concurrent)
 	if [ $CRONSH_MAX_CONCURRENT_INSTANCES != 0 ]
 	then
-		locks=`count_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || die
+		locks=`count_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || clean_die
 		if [ $locks -ge $CRONSH_MAX_CONCURRENT_INSTANCES ]
 		then
-			die "Too many concurrent Jobs are running ($locks, max: $CRONSH_MAX_CONCURRENT_INSTANCES)"
+			clean_die "Too many concurrent Jobs are running ($locks, max: $CRONSH_MAX_CONCURRENT_INSTANCES)"
 		fi
 	fi
-	flock --shared --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_sh"
+	flock --shared --nonblock $CRONSH_LOCK_FD || clean_die "$msg_no_lock_sh"
 	;;
 deny-new)
-	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || clean_die "$msg_no_lock_ex"
 	# TODO: info about already running instance
 	;;
 queue-new)
 	if [ $CRONSH_INSTANCE_QUEUE_SIZE != 0 ]
 	then
-		pendlocks=`count_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || die
+		pendlocks=`count_pending_locks_on_file "$CRONSH_JOBDIR_ABS/lock"` || clean_die
 		if [ $pendlocks -ge $CRONSH_INSTANCE_QUEUE_SIZE ]
 		then
-			die "Queue is full ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
+			clean_die "Queue is full ($pendlocks pending items, max: $CRONSH_INSTANCE_QUEUE_SIZE)"
 		fi
 	fi
 	
-	trap 'note "Termination requested"; [ -n "$flock_pid" ] && kill $flock_pid; exit 1' INT TERM
+	trap 'note "Termination requested"; [ -n "$flock_pid" ] && kill $flock_pid; clean_temp_files; exit 1' INT TERM
 	note "Waiting in queue"
 	
 	flock --exclusive $CRONSH_LOCK_FD &
 	flock_pid=$!
-	wait_status $flock_pid || die "$msg_no_lock_ex"
+	wait_status $flock_pid || clean_die "$msg_no_lock_ex"
 	
 	note "$msg_lock_acq"
 	trap - INT TERM
 	;;
 stop-old)
 	job_terminator_pid=''
-	trap 'note "Termination requested"; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; exit 1' INT TERM
+	trap 'note "Termination requested"; [ -n "$job_terminator_pid" ] && kill $job_terminator_pid; clean_temp_files; exit 1' INT TERM
 	
 	CRONSH_STOPOLD_LOCKFILE=`get_stopold_lockfile_name`
-	exec {CRONSH_STOPOLD_LOCK_FD}>>"$CRONSH_STOPOLD_LOCKFILE" || die "Failed to open lockfile: $CRONSH_STOPOLD_LOCKFILE"
+	exec {CRONSH_STOPOLD_LOCK_FD}>>"$CRONSH_STOPOLD_LOCKFILE" || clean_die "Failed to open lockfile: $CRONSH_STOPOLD_LOCKFILE"
 	
 	if ! flock --exclusive --nonblock $CRONSH_STOPOLD_LOCK_FD
 	then
@@ -428,7 +443,7 @@ stop-old)
 	fi
 	
 	note "Grabbing auxiliary lock"
-	flock --exclusive $CRONSH_STOPOLD_LOCK_FD || die "$msg_no_lock_ex"
+	flock --exclusive $CRONSH_STOPOLD_LOCK_FD || clean_die "$msg_no_lock_ex"
 	echo $$ >"$CRONSH_STOPOLD_LOCKFILE"
 	
 	note "Stopping old running Job Instnces if any"
@@ -437,7 +452,7 @@ stop-old)
 	
 	wait_status $job_terminator_pid
 	
-	flock --exclusive --nonblock $CRONSH_LOCK_FD || die "$msg_no_lock_ex"
+	flock --exclusive --nonblock $CRONSH_LOCK_FD || clean_die "$msg_no_lock_ex"
 	note "$msg_lock_acq"
 	
 	flock --unlock $CRONSH_STOPOLD_LOCK_FD
