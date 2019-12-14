@@ -259,9 +259,13 @@ then
 	fi
 else
 	# Run job from preconfigured cronsh directory
+	if [ -z "$CRONSH_JOBDIR" ]
+	then
+		die "CRONSH_JOBDIR is not given."
+	fi
 	if [ ! -d "$CRONSH_JOBDIR" ]
 	then
-		die "CRONSH_JOBDIR is not given or not a directory: $CRONSH_JOBDIR"
+		die "CRONSH_JOBDIR is not a directory: $CRONSH_JOBDIR"
 	fi
 fi
 
@@ -578,15 +582,19 @@ do
 		CRONSH_WORKDIR=$CRONSH_ATTEMPTS_BASEDIR/$CRONSH_ATTEMPT_DIRNAME
 		CRONSH_WORKDIR_ABS=$PWD/$CRONSH_WORKDIR
 		CRONSH_PREVIOUS_SUCCESSFUL_STARTED=`[ -e "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started" ] && cat "$CRONSH_JOBDIR_ABS/$CRONSH_WORKDIR_BASE/most-recent-success/latest-attempt/started" || echo 0`
+		CRONSH_PREVIOUS_SUCCESSFUL_STARTED_SEC=${CRONSH_PREVIOUS_SUCCESSFUL_STARTED%.*}
 		CRONSH_PREVIOUS_SUCCESSFUL_ENDED=`[ -e "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" ] && cat "$CRONSH_JOBDIR_ABS/latest-successful-instance-end" || echo 0`
+		CRONSH_PREVIOUS_SUCCESSFUL_ENDED_SEC=${CRONSH_PREVIOUS_SUCCESSFUL_ENDED%.*}
 		
 		# Expose attempt-specific variables
 		export CRONSH_ATTEMPT_START_TIMESTAMP
 		export CRONSH_WORKDIR_ABS
 		export CRONSH_PREVIOUS_SUCCESSFUL_STARTED
+		export CRONSH_PREVIOUS_SUCCESSFUL_STARTED_SEC
 		#export CRONSH_PREVIOUS_FAILED_STARTED
 		#export CRONSH_PREVIOUS_STARTED
 		export CRONSH_PREVIOUS_SUCCESSFUL_ENDED
+		export CRONSH_PREVIOUS_SUCCESSFUL_ENDED_SEC
 		#export CRONSH_PREVIOUS_FAILED_ENDED
 		#export CRONSH_PREVIOUS_ENDED
 		
