@@ -37,3 +37,5 @@ check_installation:
 	  echo -n $(LIBDIR)/$$trg:" "; \
 	  cmp -s $$trg $(LIBDIR)/$$trg && echo MATCH || echo MISMATCH; \
 	done
+
+.PHONY: all install uninstall check_installation

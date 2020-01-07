@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 set -e
 enable kill
 for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
@@ -144,7 +143,7 @@ Options:
 	then
 		show_instance_ids=(`join -j1 \
 			<(IFS=$'\n'; echo "${show_instance_ids[*]}") \
-			<(grep $show_by_exitcode_grep_flag ' 0$' "$CRONSH_JOBDIR/status-history" | cut -f1 -d' ' | sort)
+			<(grep --text $show_by_exitcode_grep_flag ' 0$' "$CRONSH_JOBDIR/status-history" | cut -f1 -d' ' | sort)
 		`)
 	fi
 	

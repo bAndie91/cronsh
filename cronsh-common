@@ -81,7 +81,7 @@ list_all_locks_on_inode()
 	# because they do not add up for me:
 	# eg. stat(1) says 0x1b for a file but 
 	# /proc/locks has "00:11:..." entry
-	grep ":$inode " /proc/locks
+	grep --text ":$inode " /proc/locks
 }
 count_locks_on_file()
 {
@@ -91,7 +91,7 @@ count_locks_on_inode()
 {
 	local inode=$1
 	if [ -z "$inode" ]; then return 1; fi
-	list_all_locks_on_inode "$inode" | grep -v '[-]>' -c
+	list_all_locks_on_inode "$inode" | grep --text -v '[-]>' -c
 	return 0
 }
 count_pending_locks_on_file()
@@ -102,14 +102,14 @@ count_pending_locks_on_inode()
 {
 	local inode=$1
 	if [ -z "$inode" ]; then return 1; fi
-	list_all_locks_on_inode "$inode" | grep '[-]>' -c
+	list_all_locks_on_inode "$inode" | grep --text '[-]>' -c
 	return 0
 }
 list_pending_locks_on_inode()
 {
 	local inode=$1
 	if [ -z "$inode" ]; then return 1; fi
-	list_all_locks_on_inode "$inode" | grep '[-]>'
+	list_all_locks_on_inode "$inode" | grep --text '[-]>'
 	return 0
 }
 list_pending_locks_on_file()
@@ -190,7 +190,7 @@ get_instance_dir()
 {
 	local jobdir=$1
 	local instanceid=$2
-	grep "^$instanceid " "$jobdir/instances-started" | cut -d' ' -f2-
+	grep --text "^$instanceid " "$jobdir/instances-started" | cut -d' ' -f2-
 }
 
 get_fq_instance_dir()
