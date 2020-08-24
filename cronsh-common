@@ -172,6 +172,13 @@ gather_non_terminated_instance_ids()
 	join -j1 -v1 <(gather_all_instance_ids "$jobdir") <(cut -f1 -d' ' "$jobdir/status-history" | sort)
 }
 
+get_terminated_instance_status()
+{
+	local jobdir=$1
+	local instance_id=$2
+	grep "^$instance_id " "$jobdir/status-history" | cut -f2 -d' '
+}
+
 gather_running_instance_ids()
 {
 	local jobdir=$1

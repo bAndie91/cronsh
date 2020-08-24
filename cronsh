@@ -133,7 +133,7 @@ delay()
 	sleep "$duration" {CRONSH_LOCK_FD}>&- {CRONSH_INSTANCE_LOCK_FD}>&- &
 	local sleep_pid=$!
 	wait $sleep_pid
-	# Trust that sleep was running for the requested period.
+	# Trust that sleep was running for the requested period. (it might run less due to terminating signals)
 	if [ $CRONSH_CAUGHT_SIGNAL = yes ]
 	then
 		kill $sleep_pid

@@ -209,8 +209,12 @@ Options:
 					attemptpid=''
 				fi
 			fi
-			laststatus=`cat "$instancedir/attempt-$lastattempt/status" 2>/dev/null`
-			# TODO: get final status code from status-history file for TERM instances
+			if [ -e "$instancedir/attempt-$lastattempt/status" ]
+			then
+				laststatus=`cat "$instancedir/attempt-$lastattempt/status"`
+			else
+				laststatus=`get_terminated_instance_status "$CRONSH_JOBDIR" "$instance_id"`
+			fi
 		fi
 		
 		printf "$fmt" "$instance_state" "$instancepid" "$started" "$ended" "$laststatus" "$attemptpid" "$attempts" ${show_workdir:+"$instancedir"}

@@ -7,5 +7,5 @@
 	# in curly brackets, so editing in runtime won't
 	# mess up shell's instruction pointer.
 	
-	exit 0
+	exit
 }
