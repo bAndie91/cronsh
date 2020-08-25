@@ -1,5 +1,3 @@
-CRONSH_ANY_DELAY=no
-
 expose more variables for hook scripts (CRONSH_PRECHECK_INTERVAL, CRONSH_ATTEMPTS_INTERVAL, CRONSH_ATTEMPTS_DEADLINE_DATESTR ...)
 and recalculate them (cronsh_apply_vars())
 

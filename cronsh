@@ -1,42 +1,6 @@
 #!/bin/bash
 
 
-# Set variable defaults
-CRONSH_NEW_INSTANCE_POLICY=allow-concurrent
-CRONSH_MAX_CONCURRENT_INSTANCES=0
-CRONSH_INSTANCE_QUEUE_SIZE=0
-CRONSH_ATTEMPTS_MAX=1
-CRONSH_ATTEMPTS_TIMEOUT=0
-CRONSH_ATTEMPTS_DEADLINE_DATESTR=''
-CRONSH_ATTEMPTS_INTERVAL=0
-CRONSH_PRECHECK_INTERVAL=5sec
-CRONSH_JOB_TIMEOUT=0
-CRONSH_JOB_DEADLINE_DATESTR=''
-CRONSH_INSTANCE_RANDOM_DELAY_ATLEAST=0
-CRONSH_INSTANCE_RANDOM_DELAY_ATMOST=0
-CRONSH_ATTEMPTS_RANDOM_DELAY_ATLEAST=0
-CRONSH_ATTEMPTS_RANDOM_DELAY_ATMOST=0
-CRONSH_ENABLE=yes
-CRONSH_NICE=19
-CRONSH_IONICE_CLASS=idle
-CRONSH_IONICE_CLASSDATA=''
-CRONSH_CAUGHT_SIGNAL=no
-CRONSH_STOP_REASON=''
-CRONSH_DISABLE_ON_FAIL=no
-CRONSH_MIN_COOLDOWN=0
-CRONSH_MIN_COOLDOWN_SUCCESS=0
-CRONSH_MIN_COOLDOWN_FAILED=0
-CRONSH_KEEPT=maybe
-CRONSH_READ_CONFIG=yes
-CRONSH_SHELL_MODE=no
-CRONSH_EXECUTION_STRING=''
-CRONSH_LOG_TEMPLATE='cronsh: {DATE} {TIME} [{JOBDIR}] {MESSAGE}'
-CRONSH_SHELL=$BASH
-CRONSH_JOBDIR=''
-
-
-# Define subroutines
-
 set -e
 for libdir in "$(dirname "`readlink -f "$0"`")" /usr/lib/cronsh /usr/share/cronsh ""
 do
@@ -52,7 +16,14 @@ do
 	fi
 done
 unset libdir
+
+# Set variable defaults
+cronsh_set_variable_defaults
+
 set +e
+
+
+# Define subroutines
 
 exit_cronsh()
 {
@@ -268,12 +239,17 @@ else
 	# Run job from preconfigured cronsh directory
 	if [ -z "$CRONSH_JOBDIR" ]
 	then
-		die "CRONSH_JOBDIR is not given."
+		CRONSH_JOBDIR=$1
+		if [ -z "$CRONSH_JOBDIR" ]
+		then
+			die "CRONSH_JOBDIR is not given."
+		fi
 	fi
 	if [ ! -d "$CRONSH_JOBDIR" ]
 	then
 		die "CRONSH_JOBDIR is not a directory: $CRONSH_JOBDIR"
 	fi
+	# TODO: read cli parameters for job instance
 fi
 
 
@@ -309,7 +285,7 @@ then
 	then
 		die
 	fi
-	if [ "$CRONSH_KEEPT" = maybe -o "$CRONSH_KEEPT" = must ] && type keept >/dev/null 2>&1
+	if [ "$CRONSH_KEEPT" = prefer -o "$CRONSH_KEEPT" = must ] && type keept >/dev/null 2>&1
 	then
 		# Generate list of all CRONSH_* variable to pass to re-invoked cronsh
 		all_params=()
@@ -333,7 +309,9 @@ then
 		else
 			all_params+=("$@")
 		fi
+		# re-executing ourself within keept
 		exec keept bmtu "$CRONSH_KEEPT_SOCKET_TMP" "$BASH" "$0" CRONSH_READ_CONFIG=no "${all_params[@]}"
+		exit 127
 	fi
 fi
 
@@ -495,7 +473,7 @@ flock --exclusive --nonblock $CRONSH_INSTANCE_LOCK_FD
 if [ -n "$CRONSH_KEEPT_SOCKET_TMP" ]
 then
 	mv "$CRONSH_KEEPT_SOCKET_TMP" "$CRONSH_INSTANCE_WORKDIR"/console
-	unset CRONSH_KEEPT_SOCKET_TMP
+	CRONSH_KEEPT_SOCKET_TMP="$CRONSH_INSTANCE_WORKDIR"/console
 fi
 exec {stdout_copy}>&1
 exec {stderr_copy}>&2

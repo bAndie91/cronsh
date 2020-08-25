@@ -102,13 +102,13 @@ CRONSH_IONICE_CLASSDATA=''
 
 # CRONSH_KEEPT
 # integration with keept [https://github.com/domo141/keept]
-# options: maybe, must, no
-#   maybe - start job in keept if it's available
+# options: prefer, must, no
+#   prefer - start job in keept if it's available
 #   must - start job in keept or fail
 #   no - don't start keept
 # using keept allows you to bring cronsh job to the foreground on any terminal
 # useful when running jobs in the background
-CRONSH_KEEPT=maybe
+CRONSH_KEEPT=prefer
 
 # CRONSH_LOG_TEMPLATE
 # the format of cronsh log messages

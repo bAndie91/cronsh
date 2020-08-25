@@ -505,8 +505,19 @@ stop)
 	done
 	;;
 
+vars)
+	echo "Showing variables defaults:" >&2
+	(
+		cronsh_set_variable_defaults
+		for varname in `compgen -v -X "!$cronsh_varnameprefix*"`
+		do
+			echo "$varname=${!varname}"
+		done
+	)
+	;;
+
 *)
-	echo "cronshctl [ps | stop | log | attach | history]" >&2
+	echo "cronshctl [ps | stop | log | attach | history | vars]" >&2
 	exit 1
 	;;
 esac
