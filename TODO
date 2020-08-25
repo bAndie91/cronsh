@@ -5,8 +5,6 @@ allow job parameters
 
 cronshctl ps --start-time --end-time
 
-cronshctl vars <JOBDIR>
-
 allow delete an instance's work dir (which did nothing valuable)
 
 keep time (timeout and deadline) in precondition check phase as well

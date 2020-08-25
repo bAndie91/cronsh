@@ -294,6 +294,23 @@ CRONSH_SHELL=$BASH
 CRONSH_JOBDIR=''
 }
 
+cronsh_read_config_variables()
+{
+	local saved_CRONSH_JOBDIR=$CRONSH_JOBDIR
+	local saved_CRONSH_EXECUTION_STRING=$CRONSH_EXECUTION_STRING
+	local cfgfile
+	
+	[ ! -e "$CRONSH_JOBDIR"/config ] || . "$CRONSH_JOBDIR"/config
+	for cfgfile in "$CRONSH_JOBDIR"/config.d/*
+	do
+		. "$cfgfile"
+	done
+	
+	CRONSH_JOBDIR=$saved_CRONSH_JOBDIR
+	CRONSH_EXECUTION_STRING=$saved_CRONSH_EXECUTION_STRING
+}
+
+
 # variables not exposed directly to user
 human_date_fmt_nsec="%Y-%m-%d_%H:%M:%S.%N"
 human_date_fmt_sec="%Y-%m-%d_%H:%M:%S"
